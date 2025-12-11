@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp } from 'lucide-react';
+import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp, SwitchCamera } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
 const CaptureStation = ({ className = '' }) => {
@@ -22,10 +22,34 @@ const CaptureStation = ({ className = '' }) => {
         capture
     } = usePhotoBooth();
 
+    const [devices, setDevices] = useState([]);
+    const [activeDeviceId, setActiveDeviceId] = useState(undefined);
+
+    const handleDevices = React.useCallback(
+        (mediaDevices) =>
+            setDevices(mediaDevices.filter(({ kind }) => kind === "videoinput")),
+        [setDevices]
+    );
+
+    useEffect(() => {
+        navigator.mediaDevices.enumerateDevices().then(handleDevices);
+    }, [handleDevices]);
+
+    const switchCamera = () => {
+        if (devices.length < 2) return;
+        const currentIndex = devices.findIndex(d => d.deviceId === activeDeviceId);
+        // If activeDeviceId is currently undefined (default), start cycling from 0 (or 1)
+        // Usually, the default "user" cam is one of them.
+        // Let's just pick the next one in the list.
+        const nextIndex = (currentIndex + 1) % devices.length;
+        setActiveDeviceId(devices[nextIndex].deviceId);
+    };
+
     const videoConstraints = {
         width: 1280,
-        height: 720,
-        facingMode: "user"
+        height: 960,
+        facingMode: activeDeviceId ? undefined : "user",
+        deviceId: activeDeviceId ? { exact: activeDeviceId } : undefined
     };
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,7 +67,7 @@ const CaptureStation = ({ className = '' }) => {
         };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
-    }, [mobileMenuOpen]);
+    }, [mobileMenuOpen, saveMenuOpen]);
 
     const handleMobileSelect = (seconds) => {
         setTimerDuration(seconds);
@@ -53,7 +77,7 @@ const CaptureStation = ({ className = '' }) => {
     return (
         <div className={`relative bg-black flex flex-col items-center justify-center p-8 overflow-hidden ${className}`}>
             {/* Webcam Feed */}
-            <div className="relative w-full aspect-video bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
+            <div className="relative w-full aspect-[4/3] bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group max-h-[80vh]">
                 <Webcam
                     audio={false}
                     ref={webcamRef}
@@ -61,6 +85,7 @@ const CaptureStation = ({ className = '' }) => {
                     videoConstraints={videoConstraints} // Use constraints
                     mirrored={true}
                     className="w-full h-full object-cover"
+                    onUserMedia={() => navigator.mediaDevices.enumerateDevices().then(handleDevices)}
                 />
 
                 {/* Overlays */}
@@ -72,6 +97,19 @@ const CaptureStation = ({ className = '' }) => {
                         <div className="absolute left-1/3 h-full w-px bg-white/50"></div>
                         <div className="absolute left-2/3 h-full w-px bg-white/50"></div>
                     </div>
+
+                    {/* Camera Switcher (Top Left) */}
+                    {devices.length > 1 && !isCapturingLoop && (
+                        <div className="absolute top-6 left-6 z-30">
+                            <button
+                                onClick={switchCamera}
+                                className="bg-black/40 text-white/70 hover:text-white hover:bg-black/60 p-2 rounded-full backdrop-blur-sm transition-all border border-white/10"
+                                title="Switch Camera"
+                            >
+                                <SwitchCamera size={20} />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Rec Indicator */}
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-4 py-1.5 rounded-full">
