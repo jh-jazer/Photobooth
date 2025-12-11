@@ -1,11 +1,11 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download } from 'lucide-react';
+import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
-const CaptureStation = () => {
+const CaptureStation = ({ className = '' }) => {
     const {
         webcamRef,
         isCapturingLoop, setIsCapturingLoop,
@@ -28,8 +28,26 @@ const CaptureStation = () => {
         facingMode: "user"
     };
 
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // Close menu when clicking outside (simplistic)
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (mobileMenuOpen && !e.target.closest('.mobile-menu-trigger') && !e.target.closest('.mobile-menu-content')) {
+                setMobileMenuOpen(false);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [mobileMenuOpen]);
+
+    const handleMobileSelect = (seconds) => {
+        setTimerDuration(seconds);
+        setMobileMenuOpen(false);
+    };
+
     return (
-        <div className="flex-1 lg:col-span-6 relative bg-black flex flex-col items-center justify-center p-8 overflow-hidden">
+        <div className={`relative bg-black flex flex-col items-center justify-center p-8 overflow-hidden ${className}`}>
             {/* Webcam Feed */}
             <div className="relative w-full aspect-video bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
                 <Webcam
@@ -97,20 +115,30 @@ const CaptureStation = () => {
             </div>
 
             {/* Controls */}
-            <div className="mt-8 w-full max-w-5xl grid grid-cols-3 items-center px-12 z-20">
-                {/* Left: Spacer for Grid Balance */}
-                <div className="justify-self-start w-12"></div>
+            <div className="mt-8 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 items-center px-4 lg:px-12 z-20 gap-8 lg:gap-0">
+                {/* Left: Spacer (Hidden on Mobile) */}
+                <div className="hidden lg:block justify-self-start w-12"></div>
 
                 {/* Center: Main Primary Action */}
-                <div className="justify-self-center flex flex-col items-center gap-6">
+                <div className="justify-self-center flex flex-col items-center gap-6 relative">
+
                     {/* Main Capture / Pause / Save Controls */}
                     {!isCapturingLoop && capturedImages.length < totalSlots && (
                         <button
-                            onClick={() => setIsCapturingLoop(true)}
+                            onClick={() => {
+                                if (timerDuration === 0) {
+                                    capture();
+                                } else {
+                                    setIsCapturingLoop(true);
+                                }
+                            }}
                             className="group relative w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center hover:border-white transition-all shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_-15px_rgba(255,255,255,0.5)] active:scale-95"
-                            title="Start Capture"
+                            title={timerDuration === 0 ? "Take Photo" : "Start Session"}
                         >
-                            <div className="w-16 h-16 rounded-full bg-white group-hover:scale-90 transition-transform duration-300"></div>
+                            <div className="w-16 h-16 rounded-full bg-white group-hover:scale-90 transition-transform duration-300 flex items-center justify-center relative">
+                                {timerDuration > 0 && <Play size={24} className="text-zinc-400 ml-1" fill="currentColor" />}
+                                {timerDuration === 0 && <Camera size={24} className="text-zinc-400" />}
+                            </div>
                         </button>
                     )}
 
@@ -195,26 +223,68 @@ const CaptureStation = () => {
                 </div>
 
                 {/* Right: Timer Settings */}
-                <div className="justify-self-end">
+                <div className="justify-self-end relative">
                     {!isCapturingLoop && capturedImages.length < totalSlots && (
-                        <div className="flex bg-zinc-900/80 backdrop-blur-sm rounded-full p-1 border border-zinc-800 h-[50px] items-center">
-                            {[0, 3, 5, 10].map(sec => (
+                        <>
+                            {/* Desktop: Standard List */}
+                            <div className="hidden lg:flex bg-zinc-900/80 backdrop-blur-sm rounded-full p-1 border border-zinc-800 h-[50px] items-center">
+                                {[0, 3, 5, 10].map(sec => (
+                                    <button
+                                        key={sec}
+                                        onClick={() => setTimerDuration(sec)}
+                                        className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${timerDuration === sec
+                                            ? 'bg-zinc-700 text-white shadow-lg'
+                                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                            }`}
+                                        title={sec === 0 ? 'Manual Mode (No Timer)' : `Set Timer to ${sec}s`}
+                                    >
+                                        <span className="text-xs font-bold">{sec === 0 ? 'M' : sec}</span>
+                                        <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
+                                            {sec === 0 ? 'OFF' : 'SEC'}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Mobile: Single Toggle Button and Popup */}
+                            <div className="lg:hidden relative">
                                 <button
-                                    key={sec}
-                                    onClick={() => setTimerDuration(sec)}
-                                    className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${timerDuration === sec
-                                        ? 'bg-zinc-700 text-white shadow-lg'
-                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                                        }`}
-                                    title={sec === 0 ? 'Manual Mode (No Timer)' : `Set Timer to ${sec}s`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileMenuOpen(!mobileMenuOpen);
+                                    }}
+                                    className="mobile-menu-trigger w-12 h-12 rounded-full bg-zinc-900/80 backdrop-blur-sm border border-zinc-800 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
                                 >
-                                    <span className="text-xs font-bold">{sec === 0 ? 'M' : sec}</span>
-                                    <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
-                                        {sec === 0 ? 'OFF' : 'SEC'}
-                                    </span>
+                                    <div className="flex flex-col items-center leading-none">
+                                        {timerDuration === 0 ? <span className="text-xs font-bold">Man</span> : <span className="text-sm font-bold">{timerDuration}</span>}
+                                        <span className="text-[8px] uppercase text-zinc-500 font-bold">{timerDuration === 0 ? 'ual' : 'sec'}</span>
+                                    </div>
                                 </button>
-                            ))}
-                        </div>
+
+                                <AnimatePresence>
+                                    {mobileMenuOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.8, x: 20, y: 10 }}
+                                            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.8, x: 20, y: 10 }}
+                                            className="mobile-menu-content absolute bottom-16 right-0 flex flex-col gap-2 bg-zinc-950 border border-zinc-800 p-2 rounded-2xl shadow-2xl z-50 min-w-[120px] origin-bottom-right"
+                                        >
+                                            <div className="text-[10px] font-bold text-zinc-500 uppercase text-center mb-1 tracking-widest">Set Timer</div>
+                                            {[0, 3, 5, 10].map(sec => (
+                                                <button
+                                                    key={sec}
+                                                    onClick={() => handleMobileSelect(sec)}
+                                                    className={`w-full py-2.5 rounded-xl flex items-center gap-3 px-3 transition-colors ${timerDuration === sec ? 'bg-zinc-800 text-white' : 'hover:bg-zinc-900 text-zinc-400'}`}
+                                                >
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${timerDuration === sec ? 'bg-rose-500' : 'bg-transparent'}`}></div>
+                                                    <span className="text-xs font-bold">{sec === 0 ? 'Manual' : `${sec}s Timer`}</span>
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </>
                     )}
                 </div>
 

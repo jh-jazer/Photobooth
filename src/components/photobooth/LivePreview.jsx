@@ -3,7 +3,7 @@ import React from 'react';
 import { Maximize2, Plus, Minus } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
-const LivePreview = () => {
+const LivePreview = ({ className = '' }) => {
     const {
         stripRef,
         capturedImages,
@@ -13,10 +13,13 @@ const LivePreview = () => {
         bgImage,
         templateImage,
         layoutGap,
-        layoutPadding,
+        layoutPaddingTop,
+        layoutPaddingSide,
+        layoutPaddingBottom,
         photoRoundness,
-        headerText, headerFont, headerSize, headerTracking,
-        footerText, footerFont, footerSize, footerOffsetY, footerTracking,
+        textLayers,
+        selectedTextId,
+        handleTextMouseDown,
         customSlots,
         selectedSlotIndex,
         stripHeight,
@@ -28,20 +31,10 @@ const LivePreview = () => {
     } = usePhotoBooth();
 
     return (
-        <div className="hidden lg:flex lg:col-span-3 items-center justify-center p-8 relative overflow-hidden border-r border-zinc-900 bg-transparent">
+        <div className={`flex items-center justify-center p-8 relative overflow-hidden border-r border-zinc-900 bg-transparent ${className}`}>
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
 
-            {/* Live Preview Label - Fixed Position */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 bg-zinc-950/50 px-3 py-1 rounded-full backdrop-blur-sm border border-zinc-800">
-                <Maximize2 size={12} /> Live Preview
-            </div>
 
-            {/* Zoom Controls */}
-            <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-zinc-950/80 p-2 rounded-full border border-zinc-800 backdrop-blur-sm z-30 shadow-xl">
-                <button onClick={() => setPreviewScale(p => Math.max(0.2, p - 0.1))} className="p-1 hover:text-white text-zinc-400 hover:bg-zinc-800 rounded-full transition-colors"><Minus size={14} /></button>
-                <span className="text-[10px] font-mono min-w-[3ch] text-center font-bold text-zinc-300">{Math.round(previewScale * 100)}%</span>
-                <button onClick={() => setPreviewScale(p => Math.min(1.5, p + 0.1))} className="p-1 hover:text-white text-zinc-400 hover:bg-zinc-800 rounded-full transition-colors"><Plus size={14} /></button>
-            </div>
 
             {/* Live Output Preview Container */}
             <div
@@ -50,6 +43,32 @@ const LivePreview = () => {
                 onContextMenu={(e) => e.preventDefault()}
             >
 
+                {/* Live Preview & Zoom Controls */}
+                <div className="absolute bottom-6 flex items-center gap-3 bg-zinc-950/90 pl-4 p-1.5 rounded-full border border-zinc-800 backdrop-blur-md z-30 shadow-2xl">
+                    <div className="flex items-center gap-2 mr-2">
+                        <Maximize2 size={14} className="text-zinc-500" />
+                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Live Preview</span>
+                    </div>
+                    <div className="h-4 w-px bg-zinc-800"></div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setPreviewScale(p => Math.max(0.2, p - 0.1))}
+                            className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+                        >
+                            <Minus size={14} />
+                        </button>
+                        <span className="text-[10px] font-mono w-[3ch] text-center font-bold text-zinc-300">
+                            {Math.round(previewScale * 100)}%
+                        </span>
+                        <button
+                            onClick={() => setPreviewScale(p => Math.min(1.5, p + 0.1))}
+                            className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+                        >
+                            <Plus size={14} />
+                        </button>
+                    </div>
+                </div>
+
                 <div className="relative shadow-2xl transition-transform duration-75 origin-center" style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewScale})` }}>
                     <div
                         ref={stripRef}
@@ -57,17 +76,13 @@ const LivePreview = () => {
                         style={{
                             ...(templateImage ? { backgroundImage: `url(${templateImage})`, backgroundSize: 'cover', backgroundPosition: 'center', height: `${stripHeight}px` } : (bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: bgColor || undefined })),
                             gap: `${layoutGap}px`,
-                            padding: `${layoutPadding}px`
+                            paddingTop: `${layoutPaddingTop}px`,
+                            paddingLeft: `${layoutPaddingSide}px`,
+                            paddingRight: `${layoutPaddingSide}px`,
+                            paddingBottom: `${layoutPaddingBottom}px`
                         }}
                     >
-                        {/* Customizable Header */}
-                        {headerText && (
-                            <div className={`text-center leading-tight whitespace-pre-wrap pb-2 ${selectedDesign.text} drop-shadow-sm`}>
-                                <span className={`${headerFont} ${headerSize} ${headerTracking} font-bold opacity-90`}>
-                                    {headerText}
-                                </span>
-                            </div>
-                        )}
+
 
                         {templateImage ? (
                             // Custom Layout Mode (Absolute Canvas)
@@ -146,14 +161,24 @@ const LivePreview = () => {
                             </div>
                         )}
 
-                        {/* Customizable Footer */}
-                        {footerText && (
-                            <div className={`text-center leading-tight whitespace-pre-wrap ${selectedDesign.text} drop-shadow-sm absolute bottom-0 left-0 w-full p-2`} style={{ transform: `translateY(${footerOffsetY}px)` }}>
-                                <span className={`${footerFont} ${footerSize} ${footerTracking} font-bold opacity-90`}>
-                                    {footerText}
-                                </span>
+                        {/* Text Layers */}
+                        {textLayers.map(layer => (
+                            <div
+                                key={layer.id}
+                                onMouseDown={(e) => handleTextMouseDown(e, layer.id)}
+                                className={`absolute z-40 cursor-move select-none whitespace-nowrap ${layer.fontFamily} ${layer.tracking} ${selectedTextId === layer.id ? 'ring-1 ring-rose-500 bg-black/10' : 'hover:ring-1 hover:ring-white/30'}`}
+                                style={{
+                                    left: `${layer.x}px`,
+                                    top: `${layer.y}px`,
+                                    fontSize: `${layer.fontSize}px`,
+                                    color: layer.color,
+                                    transform: `rotate(${layer.rotation || 0}deg)`,
+                                    fontWeight: layer.fontWeight || 'bold',
+                                }}
+                            >
+                                {layer.text}
                             </div>
-                        )}
+                        ))}
                     </div>
                 </div>
             </div>

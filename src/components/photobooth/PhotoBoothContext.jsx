@@ -25,21 +25,14 @@ export const PhotoBoothProvider = ({ children }) => {
 
     // Layout State (Custom)
     const [layoutGap, setLayoutGap] = useState(12);
-    const [layoutPadding, setLayoutPadding] = useState(8);
+    const [layoutPaddingTop, setLayoutPaddingTop] = useState(8);
+    const [layoutPaddingSide, setLayoutPaddingSide] = useState(8);
+    const [layoutPaddingBottom, setLayoutPaddingBottom] = useState(8);
     const [photoRoundness, setPhotoRoundness] = useState(0);
 
-    // Header State
-    const [headerText, setHeaderText] = useState('');
-    const [headerFont, setHeaderFont] = useState('font-sans');
-    const [headerSize, setHeaderSize] = useState('text-xl');
-    const [headerTracking, setHeaderTracking] = useState('tracking-normal');
-
-    // Footer State
-    const [footerText, setFooterText] = useState('');
-    const [footerFont, setFooterFont] = useState('font-sans');
-    const [footerSize, setFooterSize] = useState('text-sm');
-    const [footerOffsetY, setFooterOffsetY] = useState(0);
-    const [footerTracking, setFooterTracking] = useState('tracking-normal');
+    // Text Layers State
+    const [textLayers, setTextLayers] = useState([]);
+    const [selectedTextId, setSelectedTextId] = useState(null);
 
     // Custom Template Slots
     const [customSlots, setCustomSlots] = useState([
@@ -55,14 +48,6 @@ export const PhotoBoothProvider = ({ children }) => {
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
 
-    // Saved Templates State
-    const [savedTemplates, setSavedTemplates] = useState([]);
-
-    // Recent History State
-    const [recentColors, setRecentColors] = useState([]);
-    const [recentBgImages, setRecentBgImages] = useState([]);
-    const [recentTemplateImages, setRecentTemplateImages] = useState([]);
-
     // --- REFS ---
     const webcamRef = useRef(null);
     const stripRef = useRef(null);
@@ -71,107 +56,119 @@ export const PhotoBoothProvider = ({ children }) => {
     const templateFileInputRef = useRef(null);
     const dragRef = useRef(null);
 
-    // --- LOGIC ---
-
-    // Load templates & recents on mount
-    useEffect(() => {
-        const saved = localStorage.getItem('photobooth_templates');
-        if (saved) {
-            try { setSavedTemplates(JSON.parse(saved)); } catch (e) { console.error(e); }
-        }
-
-        const recents = localStorage.getItem('photobooth_recents');
-        if (recents) {
-            try {
-                const data = JSON.parse(recents);
-                if (data.colors) setRecentColors(data.colors);
-                if (data.bgImages) setRecentBgImages(data.bgImages);
-                if (data.templateImages) setRecentTemplateImages(data.templateImages);
-            } catch (e) { console.error(e); }
-        }
-    }, []);
-
-    // Save templates loop
-    useEffect(() => {
-        localStorage.setItem('photobooth_templates', JSON.stringify(savedTemplates));
-    }, [savedTemplates]);
-
-    // Save recents loop
-    useEffect(() => {
-        const data = {
-            colors: recentColors,
-            bgImages: recentBgImages,
-            templateImages: recentTemplateImages
-        };
+    // --- Saved & Recents Logic ---
+    const [savedTemplates, setSavedTemplates] = useState(() => {
         try {
-            localStorage.setItem('photobooth_recents', JSON.stringify(data));
-        } catch (e) {
-            console.error("Failed to save recents", e);
-        }
-    }, [recentColors, recentBgImages, recentTemplateImages]);
+            return JSON.parse(localStorage.getItem('savedTemplates')) || [];
+        } catch { return []; }
+    });
 
-    const addToRecents = (item, setList) => {
-        if (!item) return;
-        setList(prev => {
-            const filtered = prev.filter(i => i !== item);
-            return [item, ...filtered].slice(0, 5);
-        });
-    };
+    const [recentColors, setRecentColors] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('recentColors')) || [];
+        } catch { return []; }
+    });
 
-    // Debounce adding color to recents
-    useEffect(() => {
-        if (!bgColor) return;
-        const timer = setTimeout(() => {
-            addToRecents(bgColor, setRecentColors);
-        }, 1000);
-        return () => clearTimeout(timer);
-    }, [bgColor]);
+    const [recentBgImages, setRecentBgImages] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('recentBgImages')) || [];
+        } catch { return []; }
+    });
+
+    const [recentTemplateImages, setRecentTemplateImages] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('recentTemplateImages')) || [];
+        } catch { return []; }
+    });
+
+    // Persistence Effects
+    useEffect(() => localStorage.setItem('savedTemplates', JSON.stringify(savedTemplates)), [savedTemplates]);
+    useEffect(() => localStorage.setItem('recentColors', JSON.stringify(recentColors)), [recentColors]);
+    useEffect(() => localStorage.setItem('recentBgImages', JSON.stringify(recentBgImages)), [recentBgImages]);
+    useEffect(() => localStorage.setItem('recentTemplateImages', JSON.stringify(recentTemplateImages)), [recentTemplateImages]);
 
     const saveTemplate = (name) => {
         const newTemplate = {
             id: Date.now(),
-            name: name || `Template ${savedTemplates.length + 1}`,
-            templateImage, // Warning: Large strings in LS
-            customSlots,
-            stripHeight,
-            layoutGap,
-            layoutPadding,
-            photoRoundness,
-            // Header/Footer? Maybe optional, but lets save layout stuff primarily
-            headerText, headerFont, headerSize, headerTracking,
-            footerText, footerFont, footerSize, footerOffsetY, footerTracking,
-            bgColor, bgImage
+            name,
+            config: {
+                selectedDesign, bgColor, bgImage, templateImage,
+                layoutGap, layoutPaddingTop, layoutPaddingSide, layoutPaddingBottom, photoRoundness,
+                headerText, headerFont, headerSize, headerTracking,
+                footerText, footerFont, footerSize, footerOffsetY, footerTracking,
+                customSlots, stripHeight
+            }
         };
-        setSavedTemplates(prev => [...prev, newTemplate]);
+        setSavedTemplates(prev => [newTemplate, ...prev]);
     };
 
     const loadTemplate = (template) => {
-        setTemplateImage(template.templateImage || null);
-        setCustomSlots(template.customSlots || []);
-        setStripHeight(template.stripHeight || 640);
+        const c = template.config;
+        if (c.selectedDesign) setSelectedDesign(c.selectedDesign);
+        if (c.bgColor !== undefined) setBgColor(c.bgColor);
+        if (c.bgImage !== undefined) setBgImage(c.bgImage);
+        if (c.templateImage !== undefined) setTemplateImage(c.templateImage);
 
-        setLayoutGap(template.layoutGap !== undefined ? template.layoutGap : 12);
-        setLayoutPadding(template.layoutPadding !== undefined ? template.layoutPadding : 8);
-        setPhotoRoundness(template.photoRoundness !== undefined ? template.photoRoundness : 0);
+        if (c.layoutGap !== undefined) setLayoutGap(c.layoutGap);
+        if (c.layoutPaddingTop !== undefined) setLayoutPaddingTop(c.layoutPaddingTop);
+        if (c.layoutPaddingSide !== undefined) setLayoutPaddingSide(c.layoutPaddingSide);
+        if (c.layoutPaddingBottom !== undefined) setLayoutPaddingBottom(c.layoutPaddingBottom);
+        // Fallback for old templates
+        if (c.layoutPadding !== undefined) {
+            if (c.layoutPaddingTop === undefined) setLayoutPaddingTop(c.layoutPadding);
+            if (c.layoutPaddingSide === undefined) setLayoutPaddingSide(c.layoutPadding);
+            if (c.layoutPaddingBottom === undefined) setLayoutPaddingBottom(c.layoutPadding);
+        }
+        if (c.photoRoundness !== undefined) setPhotoRoundness(c.photoRoundness);
 
-        setHeaderText(template.headerText || '');
-        setHeaderFont(template.headerFont || 'font-sans');
-        setHeaderSize(template.headerSize || 'text-xl');
-        setHeaderTracking(template.headerTracking || 'tracking-normal');
+        if (c.textLayers !== undefined) setTextLayers(c.textLayers);
 
-        setFooterText(template.footerText || '');
-        setFooterFont(template.footerFont || 'font-sans');
-        setFooterSize(template.footerSize || 'text-sm');
-        setFooterOffsetY(template.footerOffsetY || 0);
-        setFooterTracking(template.footerTracking || 'tracking-normal');
-
-        setBgColor(template.bgColor || '');
-        setBgImage(template.bgImage || null);
+        if (c.customSlots !== undefined) setCustomSlots(c.customSlots);
+        if (c.stripHeight !== undefined) setStripHeight(c.stripHeight);
     };
 
     const deleteTemplate = (id) => {
         setSavedTemplates(prev => prev.filter(t => t.id !== id));
     };
+
+    const addTextLayer = () => {
+        const id = Date.now();
+        setTextLayers(prev => [...prev, {
+            id,
+            text: 'Add Text',
+            x: 50, y: 50,
+            fontFamily: 'font-sans',
+            fontSize: 24,
+            fontWeight: 'normal',
+            color: '#000000',
+            tracking: 'tracking-normal',
+            rotation: 0
+        }]);
+        setSelectedTextId(id);
+    };
+
+    const updateTextLayer = (id, updates) => {
+        setTextLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+    };
+
+    const deleteTextLayer = (id) => {
+        setTextLayers(prev => prev.filter(l => l.id !== id));
+        if (selectedTextId === id) setSelectedTextId(null);
+    };
+
+    const addToRecents = (type, value) => {
+        if (!value) return;
+        const limit = 5;
+        if (type === 'color') {
+            setRecentColors(prev => [value, ...prev.filter(c => c !== value)].slice(0, limit));
+        } else if (type === 'bgImage') {
+            setRecentBgImages(prev => [value, ...prev.filter(i => i !== value)].slice(0, limit));
+        } else if (type === 'templateImage') {
+            setRecentTemplateImages(prev => [value, ...prev.filter(i => i !== value)].slice(0, limit));
+        }
+    };
+
+    // --- LOGIC ---
 
     const totalSlots = templateImage ? customSlots.length : maxPhotos;
 
@@ -188,24 +185,23 @@ export const PhotoBoothProvider = ({ children }) => {
         }
     }, [totalSlots]);
 
-    // Capture Loop Logic
+    // Capture Loop
     useEffect(() => {
         if (!isCapturingLoop) return;
 
-        // Stop if full
-        if (capturedImages.length >= totalSlots) {
+        // Safety: Manual mode shouldn't loop
+        if (timerDuration === 0) {
             setIsCapturingLoop(false);
             return;
         }
 
-        // Automatic Mode: If timer > 0, start countdown automatically for next photo
-        if (timerDuration > 0 && countdown === null) {
+        if (capturedImages.length >= totalSlots) {
+            setIsCapturingLoop(false);
+            return;
+        }
+        if (countdown === null) {
             setCountdown(timerDuration);
         }
-
-        // Manual Mode (timer === 0): Do nothing here. 
-        // The UI will show a "Capture Next" button which calls capture() manually.
-
     }, [isCapturingLoop, capturedImages.length, totalSlots, countdown, timerDuration]);
 
     // Countdown Logic
@@ -275,9 +271,9 @@ export const PhotoBoothProvider = ({ children }) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const res = e.target.result;
-            setBgImage(res);
-            addToRecents(res, setRecentBgImages);
+            const result = e.target.result;
+            setBgImage(result);
+            addToRecents('bgImage', result);
         };
         reader.readAsDataURL(file);
         event.target.value = '';
@@ -288,9 +284,9 @@ export const PhotoBoothProvider = ({ children }) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const res = e.target.result;
-            setTemplateImage(res);
-            addToRecents(res, setRecentTemplateImages);
+            const result = e.target.result;
+            setTemplateImage(result);
+            addToRecents('templateImage', result);
         };
         reader.readAsDataURL(file);
         event.target.value = '';
@@ -348,7 +344,7 @@ export const PhotoBoothProvider = ({ children }) => {
     // Drag & Pan Logic
     const handleGlobalMouseMove = useCallback((e) => {
         if (!dragRef.current) return;
-        const { type, handle, index, startX, startY, startSlot, startPan } = dragRef.current;
+        const { type, handle, index, id, startX, startY, startSlot, startLayer, startPan } = dragRef.current;
 
         if (type === 'pan') {
             const deltaX = e.clientX - startX;
@@ -360,6 +356,18 @@ export const PhotoBoothProvider = ({ children }) => {
         const scale = previewScale;
         const deltaX = (e.clientX - startX) / scale;
         const deltaY = (e.clientY - startY) / scale;
+
+        if (type === 'text') {
+            setTextLayers(prev => prev.map(l => {
+                if (l.id !== id) return l;
+                return {
+                    ...l,
+                    x: Math.round(startLayer.x + deltaX),
+                    y: Math.round(startLayer.y + deltaY)
+                };
+            }));
+            return;
+        }
 
         setCustomSlots(prev => prev.map((slot, i) => {
             if (i !== index) return slot;
@@ -413,6 +421,25 @@ export const PhotoBoothProvider = ({ children }) => {
         document.addEventListener('mouseup', handleGlobalMouseUp);
     };
 
+    const handleTextMouseDown = (e, id) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedTextId(id);
+        const layer = textLayers.find(l => l.id === id);
+        if (!layer) return;
+
+        dragRef.current = {
+            type: 'text',
+            id,
+            startX: e.clientX,
+            startY: e.clientY,
+            startLayer: { ...layer }
+        };
+        document.addEventListener('mousemove', handleGlobalMouseMove);
+        document.addEventListener('mouseup', handleGlobalMouseUp);
+    };
+
     const handleContainerMouseDown = (e) => {
         if (e.button === 2) {
             e.preventDefault();
@@ -437,14 +464,17 @@ export const PhotoBoothProvider = ({ children }) => {
         timerDuration, setTimerDuration,
         countdown, setCountdown,
         selectedDesign, setSelectedDesign,
-        bgColor, setBgColor,
+        bgColor, setBgColor: (color) => { setBgColor(color); addToRecents('color', color); },
         bgImage, setBgImage,
         templateImage, setTemplateImage,
         layoutGap, setLayoutGap,
-        layoutPadding, setLayoutPadding,
+        layoutPaddingTop, setLayoutPaddingTop,
+        layoutPaddingSide, setLayoutPaddingSide,
+        layoutPaddingBottom, setLayoutPaddingBottom,
         photoRoundness, setPhotoRoundness,
-        headerText, setHeaderText, headerFont, setHeaderFont, headerSize, setHeaderSize, headerTracking, setHeaderTracking,
-        footerText, setFooterText, footerFont, setFooterFont, footerSize, setFooterSize, footerOffsetY, setFooterOffsetY, footerTracking, setFooterTracking,
+        textLayers, setTextLayers,
+        selectedTextId, setSelectedTextId,
+        addTextLayer, updateTextLayer, deleteTextLayer,
         customSlots, setCustomSlots,
         selectedSlotIndex, setSelectedSlotIndex,
         stripHeight, setStripHeight,
@@ -456,8 +486,10 @@ export const PhotoBoothProvider = ({ children }) => {
         // Handlers
         capture, retake, handleFileUpload, handleBgUpload, handleTemplateUpload,
         downloadStrip, printStrip,
-        handleMouseDown, handleContainerMouseDown,
+        handleMouseDown, handleTextMouseDown, handleContainerMouseDown,
         totalSlots, // Expose derived value
+
+        // Saved & Recents
         savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
         recentColors, recentBgImages, recentTemplateImages
     };
