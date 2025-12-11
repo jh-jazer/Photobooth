@@ -110,11 +110,11 @@ const PhotoBoothContent = () => {
                             <div className="text-center space-y-4">
                                 <h3 className="text-lg font-bold text-white">Scan to Donate</h3>
                                 <div className="bg-white p-2 rounded-xl inline-block">
-                                    <img src="/qr.jpg" alt="Donation QR Code" className="w-48 h-48 object-contain" />
+                                    <img src={`${import.meta.env.BASE_URL}qr.jpg`} alt="Donation QR Code" className="w-48 h-48 object-contain" />
                                 </div>
                                 <p className="text-sm text-zinc-400">Thank you for your support!</p>
                                 <a
-                                    href="/qr.jpg"
+                                    href={`${import.meta.env.BASE_URL}qr.jpg`}
                                     download="donate-qr.jpg"
                                     className="inline-block text-xs font-bold text-rose-500 hover:text-rose-400 underline underline-offset-4 mt-2"
                                 >
