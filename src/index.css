@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.font-modak {
+  font-family: 'Modak', cursive;
+}
+
+.font-shrikhand {
+  font-family: 'Shrikhand', cursive;
+}
+
+.font-passion {
+  font-family: 'Passion One', sans-serif;
+}
+
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-white;
+  }
+}
