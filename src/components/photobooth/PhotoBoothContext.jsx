@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
-import { toPng } from 'html-to-image';
+import { toPng, toJpeg } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import { STRIP_DESIGNS } from '../../constants';
 
 const PhotoBoothContext = createContext();
@@ -302,26 +303,54 @@ export const PhotoBoothProvider = ({ children }) => {
         setCountdown(null);
     };
 
-    const downloadStrip = useCallback(async () => {
+    const downloadStrip = useCallback(async (format = 'png') => {
         if (stripRef.current === null) return;
-        // Scale logic was here.
         const originalTransform = stripRef.current.style.transform;
-        // Temporarily reset transform for clean capture
         stripRef.current.style.transform = 'scale(1)';
 
         try {
-            const dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
-            stripRef.current.style.transform = originalTransform;
-            const link = document.createElement('a');
-            link.download = 'photobooth-strip.png';
-            link.href = dataUrl;
-            link.click();
+            if (format === 'pdf') {
+                const dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
+                // Calculate dimensions to match aspect ratio
+                const imgWidth = stripRef.current.offsetWidth;
+                const imgHeight = stripRef.current.offsetHeight;
+
+                // Use jsPDF
+                // We typically want A4 or just fit to image size? The user said "save as pdf".
+                // Let's make the PDF size match the image size for best quality/portability.
+                // Note: jsPDF uses points by default, we can set unit to px.
+                const pdf = new jsPDF({
+                    orientation: imgHeight > imgWidth ? 'p' : 'l',
+                    unit: 'px',
+                    format: [imgWidth, imgHeight]
+                });
+
+                pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+                pdf.save('photobooth-strip.pdf');
+            } else {
+                let dataUrl;
+                let filename = `photobooth-strip.${format}`;
+
+                if (format === 'jpg' || format === 'jpeg') {
+                    dataUrl = await toJpeg(stripRef.current, { cacheBust: true, pixelRatio: 3, quality: 0.95 });
+                } else {
+                    dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
+                }
+
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = dataUrl;
+                link.click();
+            }
+
             // Show donation popup on success
+            stripRef.current.style.transform = originalTransform;
             setIsDonationPopupOpen(true);
             setDonationStep('prompt');
         } catch (err) {
             console.error(err);
             stripRef.current.style.transform = originalTransform;
+            alert('Error saving file. Please try again.');
         }
     }, []);
 

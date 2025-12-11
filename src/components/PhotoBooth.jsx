@@ -52,8 +52,8 @@ const PhotoBoothContent = () => {
             {/* Live Preview: Mobile Overlay / Desktop Col */}
             <LivePreview
                 className={`
-                    ${showPreview ? 'fixed inset-0 z-40 bg-zinc-950 pt-20 flex flex-col' : 'hidden'} 
-                    lg:flex lg:static lg:col-span-3 lg:pt-8 lg:bg-transparent
+                    ${showPreview ? 'fixed inset-0 z-40 bg-zinc-950 pt-20 flex flex-col' : 'fixed top-0 left-[-200vw] h-0 overflow-hidden opacity-0 pointer-events-none flex flex-col'} 
+                    lg:flex lg:static lg:col-span-3 lg:pt-8 lg:bg-transparent lg:h-auto lg:overflow-visible lg:opacity-100 lg:pointer-events-auto
                 `}
             />
 
@@ -113,6 +113,13 @@ const PhotoBoothContent = () => {
                                     <img src="/qr.jpg" alt="Donation QR Code" className="w-48 h-48 object-contain" />
                                 </div>
                                 <p className="text-sm text-zinc-400">Thank you for your support!</p>
+                                <a
+                                    href="/qr.jpg"
+                                    download="donate-qr.jpg"
+                                    className="inline-block text-xs font-bold text-rose-500 hover:text-rose-400 underline underline-offset-4 mt-2"
+                                >
+                                    Save QR Image
+                                </a>
                             </div>
                         )}
                     </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera } from 'lucide-react';
+import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
 const CaptureStation = ({ className = '' }) => {
@@ -29,12 +29,16 @@ const CaptureStation = ({ className = '' }) => {
     };
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [saveMenuOpen, setSaveMenuOpen] = useState(false);
 
     // Close menu when clicking outside (simplistic)
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (mobileMenuOpen && !e.target.closest('.mobile-menu-trigger') && !e.target.closest('.mobile-menu-content')) {
                 setMobileMenuOpen(false);
+            }
+            if (saveMenuOpen && !e.target.closest('.save-menu-trigger')) {
+                setSaveMenuOpen(false);
             }
         };
         document.addEventListener('click', handleClickOutside);
@@ -179,17 +183,45 @@ const CaptureStation = ({ className = '' }) => {
                                 </div>
                             </button>
 
-                            <button
-                                onClick={downloadStrip}
-                                className="flex-1 relative group overflow-hidden py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold uppercase tracking-wider shadow-lg shadow-rose-900/40 transition-all hover:shadow-rose-900/60 hover:scale-[1.05] active:scale-[0.98]"
-                            >
-                                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-                                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
-                                <div className="flex items-center justify-center gap-2 relative z-10">
-                                    <span>Save</span>
-                                    <Download size={18} />
-                                </div>
-                            </button>
+                            <div className="relative flex-1 save-menu-trigger">
+                                <AnimatePresence>
+                                    {saveMenuOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            className="absolute bottom-full left-0 w-full mb-3 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col p-1.5 z-50 text-center"
+                                        >
+                                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest py-1 border-b border-zinc-800 mb-1">Format</div>
+                                            {[
+                                                { label: 'JPG Image', format: 'jpg' },
+                                                { label: 'PNG Image', format: 'png' },
+                                                { label: 'PDF Document', format: 'pdf' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.format}
+                                                    onClick={() => { downloadStrip(opt.format); setSaveMenuOpen(false); }}
+                                                    className="w-full text-center px-4 py-2 hover:bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white transition-colors rounded-lg uppercase tracking-wider"
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                <button
+                                    onClick={() => setSaveMenuOpen(!saveMenuOpen)}
+                                    className="w-full relative group overflow-hidden py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold uppercase tracking-wider shadow-lg shadow-rose-900/40 transition-all hover:shadow-rose-900/60 hover:scale-[1.05] active:scale-[0.98]"
+                                >
+                                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                                    <div className="flex items-center justify-center gap-2 relative z-10">
+                                        <span>Save</span>
+                                        <ChevronUp size={16} className={`transition-transform duration-300 ${saveMenuOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     )}
 
