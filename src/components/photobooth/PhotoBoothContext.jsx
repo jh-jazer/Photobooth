@@ -24,6 +24,10 @@ export const PhotoBoothProvider = ({ children }) => {
     const [bgImage, setBgImage] = useState(null);
     const [templateImage, setTemplateImage] = useState(null);
 
+    // UI State
+    const [showPreview, setShowPreview] = useState(false);
+    const [showConfig, setShowConfig] = useState(false);
+
     // Layout State (Custom)
     const [layoutGap, setLayoutGap] = useState(12);
     const [layoutPaddingTop, setLayoutPaddingTop] = useState(8);
@@ -506,6 +510,8 @@ export const PhotoBoothProvider = ({ children }) => {
         bgColor, setBgColor: (color) => { setBgColor(color); addToRecents('color', color); },
         bgImage, setBgImage,
         templateImage, setTemplateImage,
+        showPreview, setShowPreview,
+        showConfig, setShowConfig,
         layoutGap, setLayoutGap,
         layoutPaddingTop, setLayoutPaddingTop,
         layoutPaddingSide, setLayoutPaddingSide,
@@ -529,7 +535,6 @@ export const PhotoBoothProvider = ({ children }) => {
         totalSlots, // Expose derived value
 
         // Saved & Recents
-        savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
         savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
         recentColors, recentBgImages, recentTemplateImages,
 

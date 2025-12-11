@@ -19,7 +19,8 @@ const CaptureStation = ({ className = '' }) => {
         handleFileUpload,
         downloadStrip,
         printStrip,
-        capture
+        capture,
+        setShowPreview // Added to control preview visibility manually
     } = usePhotoBooth();
 
     const [devices, setDevices] = useState([]);
@@ -211,7 +212,14 @@ const CaptureStation = ({ className = '' }) => {
                     {!isCapturingLoop && capturedImages.length >= totalSlots && (
                         <div className="flex gap-4 w-full max-w-md justify-center">
                             <button
-                                onClick={printStrip}
+                                onClick={() => {
+                                    if (window.innerWidth < 1024) {
+                                        setShowPreview(true);
+                                        setTimeout(printStrip, 500);
+                                    } else {
+                                        printStrip();
+                                    }
+                                }}
                                 className="flex-1 relative group overflow-hidden py-4 rounded-2xl bg-white text-black font-bold uppercase tracking-wider shadow-lg shadow-white/5 transition-all hover:shadow-white/20 hover:scale-[1.05] active:scale-[0.98]"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-b from-zinc-100 to-zinc-300 opacity-0 group-hover:opacity-50 transition-opacity" />
@@ -232,13 +240,25 @@ const CaptureStation = ({ className = '' }) => {
                                         >
                                             <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest py-1 border-b border-zinc-800 mb-1">Format</div>
                                             {[
-                                                { label: 'JPG Image', format: 'jpg' },
-                                                { label: 'PNG Image', format: 'png' },
-                                                { label: 'PDF Document', format: 'pdf' }
+                                                { label: 'JPG', format: 'jpg' },
+                                                { label: 'PNG', format: 'png' },
+                                                { label: 'PDF', format: 'pdf' }
                                             ].map(opt => (
                                                 <button
                                                     key={opt.format}
-                                                    onClick={() => { downloadStrip(opt.format); setSaveMenuOpen(false); }}
+                                                    onClick={() => {
+                                                        setSaveMenuOpen(false);
+                                                        // Mobile fix: Show preview first to ensure element is rendered
+                                                        if (window.innerWidth < 1024) {
+                                                            setShowPreview(true);
+                                                            // Small delay to allow render
+                                                            setTimeout(() => {
+                                                                downloadStrip(opt.format);
+                                                            }, 500);
+                                                        } else {
+                                                            downloadStrip(opt.format);
+                                                        }
+                                                    }}
                                                     className="w-full text-center px-4 py-2 hover:bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white transition-colors rounded-lg uppercase tracking-wider"
                                                 >
                                                     {opt.label}

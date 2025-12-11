@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Settings, Eye, X, Camera, Heart } from 'lucide-react';
 import { usePhotoBooth, PhotoBoothProvider } from './photobooth/PhotoBoothContext';
 import LivePreview from './photobooth/LivePreview';
@@ -6,12 +6,11 @@ import CaptureStation from './photobooth/CaptureStation';
 import ConfigurationPanel from './photobooth/ConfigurationPanel';
 
 const PhotoBoothContent = () => {
-    const [showConfig, setShowConfig] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
-
     const {
         isDonationPopupOpen, setIsDonationPopupOpen,
-        donationStep, setDonationStep
+        donationStep, setDonationStep,
+        showConfig, setShowConfig,
+        showPreview, setShowPreview
     } = usePhotoBooth();
 
     // Toggle logic: prevent both from being open on mobile (optional, but cleaner)
