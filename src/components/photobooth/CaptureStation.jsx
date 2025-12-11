@@ -1,0 +1,235 @@
+
+import React from 'react';
+import Webcam from 'react-webcam';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download } from 'lucide-react';
+import { usePhotoBooth } from './PhotoBoothContext';
+
+const CaptureStation = () => {
+    const {
+        webcamRef,
+        isCapturingLoop, setIsCapturingLoop,
+        countdown,
+        capturedImages,
+        maxPhotos,
+        totalSlots,
+        timerDuration, setTimerDuration,
+        retake,
+        fileInputRef,
+        handleFileUpload,
+        downloadStrip,
+        printStrip,
+        capture
+    } = usePhotoBooth();
+
+    const videoConstraints = {
+        width: 1280,
+        height: 720,
+        facingMode: "user"
+    };
+
+    return (
+        <div className="flex-1 lg:col-span-6 relative bg-black flex flex-col items-center justify-center p-8 overflow-hidden">
+            {/* Webcam Feed */}
+            <div className="relative w-full aspect-video bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
+                <Webcam
+                    audio={false}
+                    ref={webcamRef}
+                    screenshotFormat="image/jpeg"
+                    videoConstraints={videoConstraints} // Use constraints
+                    mirrored={true}
+                    className="w-full h-full object-cover"
+                />
+
+                {/* Overlays */}
+                <div className="absolute inset-0 pointer-events-none">
+                    {/* Grid Lines (Subtle) */}
+                    <div className="absolute inset-0 opacity-20">
+                        <div className="absolute top-1/3 w-full h-px bg-white/50"></div>
+                        <div className="absolute top-2/3 w-full h-px bg-white/50"></div>
+                        <div className="absolute left-1/3 h-full w-px bg-white/50"></div>
+                        <div className="absolute left-2/3 h-full w-px bg-white/50"></div>
+                    </div>
+
+                    {/* Rec Indicator */}
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-4 py-1.5 rounded-full">
+                        <div className={`w-2 h-2 rounded-full bg-red-500 ${isCapturingLoop ? 'animate-pulse' : ''}`}></div>
+                        <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase">
+                            {isCapturingLoop ? 'REC' : 'STANDBY'}
+                        </span>
+                    </div>
+
+                    {/* Progress Indicator */}
+                    <div className="absolute top-6 right-6 font-mono text-xs font-bold text-white/50 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
+                        {capturedImages.length} / {totalSlots}
+                    </div>
+                </div>
+
+                {/* Flash Effect */}
+                <AnimatePresence>
+                    {countdown === 0 && (
+                        <motion.div
+                            initial={{ opacity: 1 }}
+                            animate={{ opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="absolute inset-0 bg-white z-50 pointer-events-none"
+                        />
+                    )}
+                </AnimatePresence>
+
+                {/* Countdown Overlay */}
+                <AnimatePresence>
+                    {countdown !== null && countdown > 0 && (
+                        <motion.div
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 1.5, opacity: 0 }}
+                            key={countdown}
+                            className="absolute inset-0 flex items-center justify-center z-40"
+                        >
+                            <span className="text-[180px] font-black text-white drop-shadow-2xl tabular-nums tracking-tighter mix-blend-overlay">
+                                {countdown}
+                            </span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Controls */}
+            <div className="mt-8 w-full max-w-5xl grid grid-cols-3 items-center px-12 z-20">
+                {/* Left: Spacer for Grid Balance */}
+                <div className="justify-self-start w-12"></div>
+
+                {/* Center: Main Primary Action */}
+                <div className="justify-self-center flex flex-col items-center gap-6">
+                    {/* Main Capture / Pause / Save Controls */}
+                    {!isCapturingLoop && capturedImages.length < totalSlots && (
+                        <button
+                            onClick={() => setIsCapturingLoop(true)}
+                            className="group relative w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center hover:border-white transition-all shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_-15px_rgba(255,255,255,0.5)] active:scale-95"
+                            title="Start Capture"
+                        >
+                            <div className="w-16 h-16 rounded-full bg-white group-hover:scale-90 transition-transform duration-300"></div>
+                        </button>
+                    )}
+
+                    {isCapturingLoop && (
+                        <div className="flex flex-col items-center gap-4">
+                            {timerDuration === 0 && (
+                                <button
+                                    onClick={capture}
+                                    className="w-20 h-20 rounded-full bg-white border-4 border-zinc-200 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-black"
+                                    title="Take Photo"
+                                >
+                                    <div className="w-16 h-16 rounded-full border-2 border-dashed border-black/30 flex items-center justify-center">
+                                        <div className="w-12 h-12 rounded-full bg-black/10"></div>
+                                    </div>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setIsCapturingLoop(false);
+                                }}
+                                className={`px-6 py-3 bg-zinc-900 border border-zinc-800 text-white font-bold text-xs tracking-widest uppercase rounded-full hover:bg-zinc-800 transition-all flex items-center gap-2 ${timerDuration === 0 ? 'opacity-50 hover:opacity-100' : ''}`}
+                            >
+                                <Pause size={14} /> {timerDuration === 0 ? 'End Session' : 'Pause'}
+                            </button>
+                        </div>
+                    )}
+
+                    {!isCapturingLoop && capturedImages.length >= totalSlots && (
+                        <div className="flex gap-4 w-full max-w-md justify-center">
+                            <button
+                                onClick={printStrip}
+                                className="flex-1 relative group overflow-hidden py-4 rounded-2xl bg-white text-black font-bold uppercase tracking-wider shadow-lg shadow-white/5 transition-all hover:shadow-white/20 hover:scale-[1.05] active:scale-[0.98]"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-b from-zinc-100 to-zinc-300 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                <div className="flex items-center justify-center gap-2 relative z-10">
+                                    <span>Print</span>
+                                    <Printer size={18} className="text-black group-hover:scale-110 transition-transform duration-300" />
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={downloadStrip}
+                                className="flex-1 relative group overflow-hidden py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold uppercase tracking-wider shadow-lg shadow-rose-900/40 transition-all hover:shadow-rose-900/60 hover:scale-[1.05] active:scale-[0.98]"
+                            >
+                                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                                <div className="flex items-center justify-center gap-2 relative z-10">
+                                    <span>Save</span>
+                                    <Download size={18} />
+                                </div>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Secondary Actions (Text Links) */}
+                    {!isCapturingLoop && (
+                        <div className="flex items-center gap-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                            {/* Upload Link */}
+                            <button
+                                onClick={() => fileInputRef.current.click()}
+                                className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-2 group"
+                            >
+                                <Upload size={14} className="group-hover:-translate-y-0.5 transition-transform" />
+                                <span>Upload</span>
+                            </button>
+
+                            {/* Retake Link - Only if we have images */}
+                            {capturedImages.length > 0 && (
+                                <>
+                                    <div className="w-1 h-1 rounded-full bg-zinc-800"></div>
+                                    <button
+                                        onClick={retake}
+                                        className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-red-400 transition-colors flex items-center gap-2 group"
+                                    >
+                                        <Trash2 size={14} className="group-hover:-translate-y-0.5 transition-transform" />
+                                        <span>Restart</span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Right: Timer Settings */}
+                <div className="justify-self-end">
+                    {!isCapturingLoop && capturedImages.length < totalSlots && (
+                        <div className="flex bg-zinc-900/80 backdrop-blur-sm rounded-full p-1 border border-zinc-800 h-[50px] items-center">
+                            {[0, 3, 5, 10].map(sec => (
+                                <button
+                                    key={sec}
+                                    onClick={() => setTimerDuration(sec)}
+                                    className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${timerDuration === sec
+                                        ? 'bg-zinc-700 text-white shadow-lg'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                        }`}
+                                    title={sec === 0 ? 'Manual Mode (No Timer)' : `Set Timer to ${sec}s`}
+                                >
+                                    <span className="text-xs font-bold">{sec === 0 ? 'M' : sec}</span>
+                                    <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
+                                        {sec === 0 ? 'OFF' : 'SEC'}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Hidden File Input for Upload */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                />
+            </div>
+        </div>
+    );
+};
+
+export default CaptureStation;
