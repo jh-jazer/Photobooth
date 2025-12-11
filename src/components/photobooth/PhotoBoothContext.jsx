@@ -48,6 +48,10 @@ export const PhotoBoothProvider = ({ children }) => {
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
 
+    // Donation Popup State
+    const [isDonationPopupOpen, setIsDonationPopupOpen] = useState(false);
+    const [donationStep, setDonationStep] = useState('prompt'); // 'prompt' | 'qr'
+
     // --- REFS ---
     const webcamRef = useRef(null);
     const stripRef = useRef(null);
@@ -312,6 +316,9 @@ export const PhotoBoothProvider = ({ children }) => {
             link.download = 'photobooth-strip.png';
             link.href = dataUrl;
             link.click();
+            // Show donation popup on success
+            setIsDonationPopupOpen(true);
+            setDonationStep('prompt');
         } catch (err) {
             console.error(err);
             stripRef.current.style.transform = originalTransform;
@@ -335,6 +342,9 @@ export const PhotoBoothProvider = ({ children }) => {
                 </html>
             `);
             printWindow.document.close();
+            // Show donation popup on success
+            setIsDonationPopupOpen(true);
+            setDonationStep('prompt');
         } catch (err) {
             console.error(err);
             stripRef.current.style.transform = originalTransform;
@@ -491,7 +501,12 @@ export const PhotoBoothProvider = ({ children }) => {
 
         // Saved & Recents
         savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
-        recentColors, recentBgImages, recentTemplateImages
+        savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
+        recentColors, recentBgImages, recentTemplateImages,
+
+        // Donation Popup
+        isDonationPopupOpen, setIsDonationPopupOpen,
+        donationStep, setDonationStep
     };
 
     return (
