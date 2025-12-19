@@ -19,10 +19,11 @@ export const PhotoBoothProvider = ({ children }) => {
     const [retakeIndex, setRetakeIndex] = useState(null);
 
     // Design State
-    const [selectedDesign, setSelectedDesign] = useState(STRIP_DESIGNS[0]);
+    const [selectedDesign, setSelectedDesign] = useState(STRIP_DESIGNS[5]); // Purple Haze - matches website theme
     const [bgColor, setBgColor] = useState('');
     const [bgImage, setBgImage] = useState(null);
     const [templateImage, setTemplateImage] = useState(null);
+    const [selectedFilter, setSelectedFilter] = useState('none');
 
     // UI State
     const [showPreview, setShowPreview] = useState(false);
@@ -194,7 +195,7 @@ export const PhotoBoothProvider = ({ children }) => {
             lastY = customSlots.length > 0 ? Math.max(...customSlots.map(s => s.y + s.h)) : 50;
         } else {
             const contentWidth = 240 - (layoutPaddingSide * 2);
-            const slotHeight = contentWidth / 1.5;
+            const slotHeight = 125; // Fixed height for non-custom templates
             lastY = layoutPaddingTop + (maxPhotos * slotHeight) + ((maxPhotos - 1) * layoutGap);
         }
 
@@ -868,6 +869,7 @@ export const PhotoBoothProvider = ({ children }) => {
         layoutPaddingBottom, setLayoutPaddingBottom,
         photoRoundness, setPhotoRoundness,
         isTemplateLocked, setIsTemplateLocked,
+        selectedFilter, setSelectedFilter,
         textLayers: elements, setTextLayers: setElements, // Backward compat alias if needed, but better to use new names
         elements, setElements,
         selectedElementId, setSelectedElementId,

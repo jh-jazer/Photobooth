@@ -5,7 +5,7 @@ import {
     Upload, Save, FolderOpen, Plus, X, RotateCcw, Lock, Unlock, Type
 } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
-import { STRIP_DESIGNS } from '../../constants';
+import { STRIP_DESIGNS, CAMERA_FILTERS } from '../../constants';
 // eslint-disable-next-line no-unused-vars
 import FontPicker from '../common/FontPicker';
 
@@ -43,6 +43,7 @@ const ConfigurationPanel = ({ className = '' }) => {
         recentColors, recentBgImages, recentTemplateImages, addToRecents, removeFromRecents, clearRecents,
         showLayoutPrompt, setShowLayoutPrompt, confirmLayout,
         isTemplateLocked, setIsTemplateLocked,
+        selectedFilter, setSelectedFilter,
     } = usePhotoBooth();
 
     const [newTemplateName, setNewTemplateName] = React.useState('');
@@ -492,6 +493,93 @@ const ConfigurationPanel = ({ className = '' }) => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-zinc-900"></div>
+
+                {/* Camera Filters */}
+                <div className="group">
+                    <button
+                        onClick={() => toggleSection('filters')}
+                        className="w-full flex items-center justify-between text-xs font-bold text-zinc-500 uppercase tracking-widest hover:text-zinc-300 transition-colors"
+                    >
+                        <span className="flex items-center gap-2">Camera Filters</span>
+                        <ChevronDown size={14} className={`transition-transform duration-300 ${activeSection === 'filters' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {activeSection === 'filters' && (
+                        <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto custom-scrollbar pr-1">
+                                {CAMERA_FILTERS.map(filter => (
+                                    <button
+                                        key={filter.id}
+                                        onClick={() => setSelectedFilter(filter.id)}
+                                        className={`relative p-2 rounded-xl border-2 transition-all text-xs font-medium ${selectedFilter === filter.id
+                                            ? 'border-rose-500 bg-rose-500/10 text-white'
+                                            : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600 hover:text-white'
+                                            }`}
+                                    >
+                                        <div className="aspect-square rounded-lg overflow-hidden mb-1.5 bg-zinc-800">
+                                            <div
+                                                className="w-full h-full bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400"
+                                                style={{ filter: filter.filter }}
+                                            />
+                                        </div>
+                                        <span className="block truncate">{filter.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-zinc-900"></div>
+
+                {/* Stickers Gallery */}
+                <div className="group">
+                    <button
+                        onClick={() => toggleSection('stickers')}
+                        className="w-full flex items-center justify-between text-xs font-bold text-zinc-500 uppercase tracking-widest hover:text-zinc-300 transition-colors"
+                    >
+                        <span className="flex items-center gap-2">Stickers</span>
+                        <ChevronDown size={14} className={`transition-transform duration-300 ${activeSection === 'stickers' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {activeSection === 'stickers' && (
+                        <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="grid grid-cols-4 gap-3">
+                                {['moonwalk.png', 'wbc.png'].map((sticker, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => {
+                                            // Load sticker as image element
+                                            const img = new Image();
+                                            img.src = `${import.meta.env.BASE_URL}stickers/${sticker}`;
+                                            img.onload = () => {
+                                                const id = Date.now() + index;
+                                                setElements(prev => [...prev, {
+                                                    id,
+                                                    type: 'image',
+                                                    src: img.src,
+                                                    x: 50,
+                                                    y: 50,
+                                                    width: 80,
+                                                    rotation: 0
+                                                }]);
+                                                setSelectedElementId(id);
+                                            };
+                                        }}
+                                        className="aspect-square rounded-xl border-2 border-zinc-800 bg-zinc-900/50 hover:border-rose-500 hover:bg-rose-500/10 transition-all p-2 group/sticker"
+                                        title={`Add ${sticker.replace('.png', '')}`}
+                                    >
+                                        <img
+                                            src={`${import.meta.env.BASE_URL}stickers/${sticker}`}
+                                            alt={sticker}
+                                            className="w-full h-full object-contain group-hover/sticker:scale-110 transition-transform"
+                                        />
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

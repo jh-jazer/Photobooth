@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp, SwitchCamera, Image } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
+import { CAMERA_FILTERS } from '../../constants';
 
 const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
     const {
@@ -23,7 +23,8 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
         setShowPreview,
         retakeIndex,
         setRetakeIndex,
-        setMaxPhotos
+        setMaxPhotos,
+        selectedFilter
     } = usePhotoBooth();
 
     const [devices, setDevices] = useState([]);
@@ -78,6 +79,23 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
         setMobileMenuOpen(false);
     };
 
+    // Spacebar to capture
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            // Only capture if spacebar is pressed and we're not in a text input
+            if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                // Only capture if not currently capturing and not in retake mode
+                if (!isCapturingLoop && retakeIndex === null) {
+                    capture();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [isCapturingLoop, retakeIndex, capture]);
+
+
     return (
         <div className={`relative bg-slate-950 flex flex-col items-center justify-center p-8 overflow-hidden ${className}`}>
             {/* Background Glow */}
@@ -91,6 +109,7 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
                     videoConstraints={videoConstraints} // Use constraints
                     mirrored={true}
                     className="w-full h-full object-cover"
+                    style={{ filter: CAMERA_FILTERS.find(f => f.id === selectedFilter)?.filter || 'none' }}
                     onUserMedia={() => navigator.mediaDevices.enumerateDevices().then(handleDevices)}
                 />
 
@@ -171,13 +190,13 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
                             {[1, 2, 3, 4].map(num => (
                                 <button
                                     key={num}
-                                    onClick={() => num === 4 && setMaxPhotos(num)}
-                                    disabled={num !== 4}
+                                    onClick={() => (num === 3 || num === 4) && setMaxPhotos(num)}
+                                    disabled={num !== 3 && num !== 4}
                                     className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${maxPhotos === num
                                         ? 'bg-zinc-700 text-white shadow-lg'
                                         : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                                        } ${num !== 4 ? 'opacity-30 cursor-not-allowed' : ''}`}
-                                    title={num !== 4 ? 'Coming Soon' : `Set Layout to ${num} Frames`}
+                                        } ${num !== 3 && num !== 4 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    title={num !== 3 && num !== 4 ? 'Coming Soon' : `Set Layout to ${num} Frames`}
                                 >
                                     <span className="text-xs font-bold">{num}</span>
                                     <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
