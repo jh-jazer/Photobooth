@@ -101,6 +101,33 @@ const PhotoBooth = ({ onHome }) => {
         };
     };
 
+    // Delete individual image from gallery
+    const deleteImage = (index) => {
+        if (window.confirm('Are you sure you want to delete this image?')) {
+            const newGallery = galleryImages.filter((_, i) => i !== index);
+            // Update localStorage directly since we don't have setGalleryImages exposed
+            try {
+                localStorage.setItem('photobooth_gallery', JSON.stringify(newGallery));
+                // Force re-render by closing and reopening gallery
+                setShowGallery(false);
+                setTimeout(() => setShowGallery(true), 0);
+            } catch (e) {
+                console.warn('Failed to update gallery');
+            }
+        }
+    };
+
+    // Share image with confirmation
+    const shareImage = (img, index) => {
+        if (window.confirm('Download this image to share?')) {
+            const link = document.createElement('a');
+            link.href = img;
+            link.download = `photobooth-${Date.now()}.png`;
+            link.click();
+        }
+    };
+
+
     // Toggle logic: prevent both from being open on mobile (optional, but cleaner)
     const toggleConfig = () => {
         setShowConfig(!showConfig);
@@ -229,14 +256,20 @@ const PhotoBooth = ({ onHome }) => {
                                                                 <div className="aspect-[1/2] rounded-xl overflow-hidden relative">
                                                                     <img src={img} alt={`Gallery ${globalIndex}`} className="w-full h-full object-contain bg-zinc-950" />
                                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                                        <a
-                                                                            href={img}
-                                                                            download={`photobooth-gallery-${globalIndex}.png`}
+                                                                        <button
+                                                                            onClick={() => shareImage(img, globalIndex)}
                                                                             className="p-3 bg-white text-black rounded-full hover:scale-110 transition-transform"
-                                                                            title="Download"
+                                                                            title="Share"
                                                                         >
                                                                             <Share2 size={20} />
-                                                                        </a>
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => deleteImage(globalIndex)}
+                                                                            className="p-3 bg-red-500 text-white rounded-full hover:scale-110 transition-transform"
+                                                                            title="Delete"
+                                                                        >
+                                                                            <Trash2 size={20} />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             </div>

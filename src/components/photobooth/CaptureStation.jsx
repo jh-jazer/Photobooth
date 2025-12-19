@@ -236,7 +236,7 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
                         </div>
                     )}
 
-                    {!isCapturingLoop && capturedImages.length >= totalSlots && (
+                    {!isCapturingLoop && capturedImages.length >= totalSlots && retakeIndex === null && (
                         <div className="flex gap-4 w-full max-w-md justify-center">
                             <button
                                 onClick={() => setShowGallery && setShowGallery(true)}
