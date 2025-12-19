@@ -13,7 +13,7 @@ export const PhotoBoothProvider = ({ children }) => {
     // Capture State
     const [isCapturingLoop, setIsCapturingLoop] = useState(false);
     const [capturedImages, setCapturedImages] = useState([]);
-    const [maxPhotos, setMaxPhotos] = useState(3);
+    const [maxPhotos, setMaxPhotos] = useState(4);
     const [timerDuration, setTimerDuration] = useState(3);
     const [countdown, setCountdown] = useState(null);
     const [retakeIndex, setRetakeIndex] = useState(null);
@@ -29,21 +29,27 @@ export const PhotoBoothProvider = ({ children }) => {
     const [showConfig, setShowConfig] = useState(false);
 
     // Layout State (Custom)
-    const [layoutGap, setLayoutGap] = useState(18);
-    const [layoutPaddingTop, setLayoutPaddingTop] = useState(15);
+    const [layoutGap, setLayoutGap] = useState(13);
+    const [layoutPaddingTop, setLayoutPaddingTop] = useState(14);
     const [layoutPaddingSide, setLayoutPaddingSide] = useState(15);
     const [layoutPaddingBottom, setLayoutPaddingBottom] = useState(90);
     const [photoRoundness, setPhotoRoundness] = useState(0);
+    const [isTemplateLocked, setIsTemplateLocked] = useState(true);
 
     // Elements State (Text & Stickers)
     const [elements, setElements] = useState([]);
     const [selectedElementId, setSelectedElementId] = useState(null);
 
+    // History State for Undo/Redo
+    const [history, setHistory] = useState([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+
     // Custom Template Slots
     const [customSlots, setCustomSlots] = useState([
-        { id: 1, x: 0, y: 0, w: 210, h: 120 },
-        { id: 2, x: 0, y: 136, w: 210, h: 120 }, // 120 + (18-2) gap
-        { id: 3, x: 0, y: 272, w: 210, h: 120 },
+        { id: 1, x: 0, y: 0, w: 210, h: 125 },
+        { id: 2, x: 0, y: 136, w: 210, h: 125 }, // 125 + (13-2) gap
+        { id: 3, x: 0, y: 272, w: 210, h: 125 },
+        { id: 4, x: 0, y: 408, w: 210, h: 125 }
     ]);
     const [selectedSlotIndex, setSelectedSlotIndex] = useState(null);
     const [stripHeight, setStripHeight] = useState(640);
@@ -69,6 +75,7 @@ export const PhotoBoothProvider = ({ children }) => {
     const bgFileInputRef = useRef(null);
     const templateFileInputRef = useRef(null);
     const dragRef = useRef(null);
+    const colorTimeoutRef = useRef(null);
 
     // --- Saved & Recents Logic ---
     const [savedTemplates, setSavedTemplates] = useState(() => {
@@ -96,10 +103,34 @@ export const PhotoBoothProvider = ({ children }) => {
     });
 
     // Persistence Effects
-    useEffect(() => localStorage.setItem('savedTemplates', JSON.stringify(savedTemplates)), [savedTemplates]);
-    useEffect(() => localStorage.setItem('recentColors', JSON.stringify(recentColors)), [recentColors]);
-    useEffect(() => localStorage.setItem('recentBgImages', JSON.stringify(recentBgImages)), [recentBgImages]);
-    useEffect(() => localStorage.setItem('recentTemplateImages', JSON.stringify(recentTemplateImages)), [recentTemplateImages]);
+    useEffect(() => { try { localStorage.setItem('savedTemplates', JSON.stringify(savedTemplates)); } catch (e) { console.warn('Storage full'); } }, [savedTemplates]);
+    useEffect(() => { try { localStorage.setItem('recentColors', JSON.stringify(recentColors)); } catch (e) { console.warn('Storage full'); } }, [recentColors]);
+    useEffect(() => { try { localStorage.setItem('recentBgImages', JSON.stringify(recentBgImages)); } catch (e) { console.warn('Storage full'); } }, [recentBgImages]);
+    useEffect(() => { try { localStorage.setItem('recentTemplateImages', JSON.stringify(recentTemplateImages)); } catch (e) { console.warn('Storage full'); } }, [recentTemplateImages]);
+
+    // Gallery Persistence
+    const [galleryImages, setGalleryImages] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('photobooth_gallery')) || [];
+        } catch { return []; }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem('photobooth_gallery', JSON.stringify(galleryImages));
+        } catch (e) {
+            console.warn('Gallery storage full - session only');
+        }
+    }, [galleryImages]);
+
+    const addToGallery = useCallback((dataUrl) => {
+        setGalleryImages(prev => [dataUrl, ...prev]);
+    }, []);
+
+    const clearGallery = () => {
+        if (window.confirm('Are you sure you want to clear your gallery?')) {
+            setGalleryImages([]);
+        }
+    };
 
     const saveTemplate = (name) => {
         const newTemplate = {
@@ -108,7 +139,7 @@ export const PhotoBoothProvider = ({ children }) => {
             config: {
                 selectedDesign, bgColor, bgImage, templateImage,
                 layoutGap, layoutPaddingTop, layoutPaddingSide, layoutPaddingBottom, photoRoundness,
-                layoutGap, layoutPaddingTop, layoutPaddingSide, layoutPaddingBottom, photoRoundness,
+
                 elements,
                 customSlots, stripHeight
             }
@@ -148,20 +179,56 @@ export const PhotoBoothProvider = ({ children }) => {
     };
 
     const addTextElement = () => {
-        const id = Date.now();
-        setElements(prev => [...prev, {
-            id,
-            type: 'text',
-            text: 'Add Text',
-            x: 50, y: 50,
-            fontFamily: 'font-sans',
-            fontSize: 24,
-            fontWeight: 'normal',
-            color: '#000000',
-            tracking: 'tracking-normal',
-            rotation: 0
-        }]);
-        setSelectedElementId(id);
+        const id1 = Date.now();
+        const id2 = id1 + 1;
+
+        const date = new Date();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        const dateStr = `${mm}.${dd}.${yyyy}`;
+
+        // Position below last image holder
+        let lastY = 0;
+        if (templateImage) {
+            lastY = customSlots.length > 0 ? Math.max(...customSlots.map(s => s.y + s.h)) : 50;
+        } else {
+            const contentWidth = 240 - (layoutPaddingSide * 2);
+            const slotHeight = contentWidth / 1.5;
+            lastY = layoutPaddingTop + (maxPhotos * slotHeight) + ((maxPhotos - 1) * layoutGap);
+        }
+
+        const startY = lastY + 20;
+
+        setElements(prev => [
+            ...prev,
+            {
+                id: id1,
+                type: 'text',
+                text: 'POTOBOOTH',
+                x: 40, y: startY,
+                fontFamily: 'font-sans',
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: '#000000',
+                tracking: 'tracking-widest',
+                rotation: 0
+            },
+            {
+                id: id2,
+                type: 'text',
+                text: dateStr,
+                x: 45, y: startY + 30,
+                fontFamily: 'font-sans',
+                fontSize: 10,
+                fontWeight: 'bold',
+                color: '#000000',
+                tracking: 'tracking-widest',
+                rotation: 0
+            }
+        ]);
+        setSelectedElementId(id1);
+        saveHistory();
     };
 
     const addImageElement = (file) => {
@@ -184,12 +251,38 @@ export const PhotoBoothProvider = ({ children }) => {
 
     const updateElement = (id, updates) => {
         setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
+        saveHistory();
     };
 
     const deleteElement = (id) => {
         setElements(prev => prev.filter(el => el.id !== id));
         if (selectedElementId === id) setSelectedElementId(null);
+        saveHistory();
     };
+
+    // History Management
+    const saveHistory = useCallback(() => {
+        const snapshot = {
+            elements: JSON.parse(JSON.stringify(elements)),
+            customSlots: JSON.parse(JSON.stringify(customSlots))
+        };
+        setHistory(prev => {
+            const newHistory = prev.slice(0, historyIndex + 1);
+            return [...newHistory, snapshot].slice(-50); // Keep last 50 states
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 49));
+    }, [elements, customSlots, historyIndex]);
+
+    const undo = useCallback(() => {
+        if (historyIndex <= 0) return;
+        const newIndex = historyIndex - 1;
+        const snapshot = history[newIndex];
+        if (snapshot) {
+            setElements(snapshot.elements);
+            setCustomSlots(snapshot.customSlots);
+            setHistoryIndex(newIndex);
+        }
+    }, [history, historyIndex]);
 
     const addToRecents = (type, value) => {
         if (!value) return;
@@ -264,14 +357,14 @@ export const PhotoBoothProvider = ({ children }) => {
             return;
         }
 
-        if (capturedImages.length >= totalSlots) {
+        if (capturedImages.length >= totalSlots && retakeIndex === null) {
             setIsCapturingLoop(false);
             return;
         }
         if (countdown === null) {
             setCountdown(timerDuration);
         }
-    }, [isCapturingLoop, capturedImages.length, totalSlots, countdown, timerDuration]);
+    }, [isCapturingLoop, capturedImages.length, totalSlots, countdown, timerDuration, retakeIndex]);
 
     // Countdown Logic
     useEffect(() => {
@@ -286,10 +379,13 @@ export const PhotoBoothProvider = ({ children }) => {
     }, [countdown, capture]);
 
     // Keyboard Slot Movement
+    // Keyboard Movement (Slots & Elements)
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (!templateImage || selectedSlotIndex === null) return;
             if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+            const hasSelection = (templateImage && selectedSlotIndex !== null) || selectedElementId !== null;
+            if (!hasSelection) return;
 
             const step = e.shiftKey ? 10 : 1;
             let deltaX = 0;
@@ -304,14 +400,53 @@ export const PhotoBoothProvider = ({ children }) => {
             }
 
             e.preventDefault();
-            setCustomSlots(prev => prev.map((slot, i) => {
-                if (i !== selectedSlotIndex) return slot;
-                return { ...slot, x: slot.x + deltaX, y: slot.y + deltaY };
-            }));
+
+            // Move Slot
+            if (templateImage && selectedSlotIndex !== null) {
+                setCustomSlots(prev => prev.map((slot, i) => {
+                    if (i !== selectedSlotIndex) return slot;
+                    return { ...slot, x: slot.x + deltaX, y: slot.y + deltaY };
+                }));
+            }
+
+            // Move Element
+            if (selectedElementId !== null) {
+                setElements(prev => prev.map(el => {
+                    if (el.id !== selectedElementId) return el;
+                    return { ...el, x: el.x + deltaX, y: el.y + deltaY };
+                }));
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [templateImage, selectedSlotIndex]);
+    }, [templateImage, selectedSlotIndex, selectedElementId]);
+
+    // Ctrl+Z Undo Handler
+    useEffect(() => {
+        const handleUndo = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                undo();
+            }
+        };
+        window.addEventListener('keydown', handleUndo);
+        return () => window.removeEventListener('keydown', handleUndo);
+    }, [undo]);
+
+    // Delete/Backspace Handler for Elements
+    useEffect(() => {
+        const handleDelete = (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            if (!selectedElementId) return;
+
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                deleteElement(selectedElementId);
+            }
+        };
+        window.addEventListener('keydown', handleDelete);
+        return () => window.removeEventListener('keydown', handleDelete);
+    }, [selectedElementId]);
 
     const handleFileUpload = (event) => {
         const files = Array.from(event.target.files);
@@ -377,17 +512,31 @@ export const PhotoBoothProvider = ({ children }) => {
         setStripHeight(pendingStripHeight);
         setTemplateImage(pendingTemplateImage);
         addToRecents('templateImage', pendingTemplateImage);
-        setLayoutPaddingTop(15);
+        setLayoutPaddingTop(14);
 
         // Generate N slots centered
         const newSlots = Array.from({ length: numFrames }, (_, i) => ({
             id: Date.now() + i,
             x: 0, // Centered (considering padding logic)
-            y: 0 + (i * 136), // Start at 0, 120h + (18-2) gap
+            y: 0 + (i * 136), // Start at 0, 125h + (13-2) gap
             w: 210,
-            h: 120
+            h: 125
         }));
         setCustomSlots(newSlots);
+
+        // Remove default text elements (POTOBOOTH and date) when using custom template
+        setElements(prev => prev.filter(el => {
+            // Remove POTOBOOTH text
+            if (el.type === 'text' && el.text === 'POTOBOOTH') {
+                return false;
+            }
+            // Remove date text (check if it looks like a date pattern)
+            if (el.type === 'text' && /^\d{2}\.\d{2}\.\d{4}$/.test(el.text)) {
+                return false;
+            }
+            // Keep other elements (user-added stickers, custom text, etc.)
+            return true;
+        }));
 
         // Reset Pending
         setPendingTemplateImage(null);
@@ -409,22 +558,52 @@ export const PhotoBoothProvider = ({ children }) => {
         try {
             if (format === 'pdf') {
                 const dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
-                // Calculate dimensions to match aspect ratio
-                const imgWidth = stripRef.current.offsetWidth;
-                const imgHeight = stripRef.current.offsetHeight;
+                // Calculate dimensions
+                const imgWidthPx = stripRef.current.offsetWidth;
+                const imgHeightPx = stripRef.current.offsetHeight;
 
-                // Use jsPDF
-                // We typically want A4 or just fit to image size? The user said "save as pdf".
-                // Let's make the PDF size match the image size for best quality/portability.
-                // Note: jsPDF uses points by default, we can set unit to px.
+                // Create PDF (A4 Landscape to fit 3 side by side)
                 const pdf = new jsPDF({
-                    orientation: imgHeight > imgWidth ? 'p' : 'l',
-                    unit: 'px',
-                    format: [imgWidth, imgHeight]
+                    orientation: 'l',
+                    unit: 'mm',
+                    format: 'a4'
                 });
 
-                pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-                pdf.save('photobooth-strip.pdf');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                // Target: 3 strips side by side
+                // A4 Landscape: 297mm x 210mm
+                // Gap between strips
+                const gap = 10;
+                const totalGaps = 2 * gap; // 2 gaps for 3 items
+
+                // Max width per strip to fit 3
+                const maxStripWidth = (pageWidth - 40) / 3; // 20mm margin each side
+
+                // Calculate scale to fit height if needed, usually width is the constraint for 3 side-by-side
+                const ratio = imgWidthPx / imgHeightPx;
+                let finalWidth = maxStripWidth;
+                let finalHeight = finalWidth / ratio;
+
+                // Check if height fits
+                if (finalHeight > (pageHeight - 20)) {
+                    finalHeight = pageHeight - 20;
+                    finalWidth = finalHeight * ratio;
+                }
+
+                // Center vertically
+                const y = (pageHeight - finalHeight) / 2;
+
+                // Calculate starting X to center the group of 3
+                const totalGroupWidth = (finalWidth * 3) + (gap * 2);
+                const startX = (pageWidth - totalGroupWidth) / 2;
+
+                pdf.addImage(dataUrl, 'PNG', startX, y, finalWidth, finalHeight);
+                pdf.addImage(dataUrl, 'PNG', startX + finalWidth + gap, y, finalWidth, finalHeight);
+                pdf.addImage(dataUrl, 'PNG', startX + (finalWidth * 2) + (gap * 2), y, finalWidth, finalHeight);
+
+                pdf.save('photobooth-strips.pdf');
             } else {
                 let dataUrl;
                 let filename = `photobooth-strip.${format}`;
@@ -434,6 +613,9 @@ export const PhotoBoothProvider = ({ children }) => {
                 } else {
                     dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
                 }
+
+                // Auto-save to gallery
+                addToGallery(dataUrl);
 
                 const link = document.createElement('a');
                 link.download = filename;
@@ -450,7 +632,7 @@ export const PhotoBoothProvider = ({ children }) => {
             stripRef.current.style.transform = originalTransform;
             alert('Error saving file. Please try again.');
         }
-    }, []);
+    }, [addToGallery, setIsDonationPopupOpen, setDonationStep]);
 
     const printStrip = useCallback(async () => {
         if (stripRef.current === null) return;
@@ -459,16 +641,76 @@ export const PhotoBoothProvider = ({ children }) => {
         try {
             const dataUrl = await toPng(stripRef.current, { cacheBust: true, pixelRatio: 3 });
             stripRef.current.style.transform = originalTransform;
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
+
+            // Auto-save to gallery
+            addToGallery(dataUrl);
+
+            // Create a hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+
+            const content = `
                 <html>
-                    <head><title>Print Photo Strip</title>
-                    <style>body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;}img{max-height:100%;max-width:100%;}</style>
+                    <head>
+                        <title>Print Photo Strip</title>
+                        <style>
+                            @page { size: landscape; margin: 10mm; }
+                            body { 
+                                margin: 0; 
+                                display: flex; 
+                                justify-content: center; 
+                                align-items: center; 
+                                height: 100vh; 
+                                gap: 20px;
+                            }
+                            img { 
+                                height: 90vh; 
+                                width: auto; 
+                                object-fit: contain;
+                                max-width: 30%; /* Ensure 3 fit */
+                            }
+                        </style>
                     </head>
-                    <body><img src="${dataUrl}" onload="window.print();window.close()" /></body>
+                    <body>
+                        <img src="${dataUrl}" />
+                        <img src="${dataUrl}" />
+                        <img src="${dataUrl}" />
+                    </body>
                 </html>
-            `);
-            printWindow.document.close();
+            `;
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(content);
+            doc.close();
+
+            // Wait for image to load before printing
+            iframe.onload = () => {
+                // Small delay to ensure render
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                    // Cleanup after print dialog usage (approximate) or leave it
+                    // Ideally we remove it, but user might cancel. 
+                    // Let's remove it after a delay
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                }, 500);
+            };
+
+            // Fallback if onload doesn't fire immediately (sometimes with dataURL)
+            const img = doc.querySelector('img');
+            if (img.complete) {
+                iframe.onload();
+            }
+
             // Show donation popup on success
             setIsDonationPopupOpen(true);
             setDonationStep('prompt');
@@ -597,13 +839,25 @@ export const PhotoBoothProvider = ({ children }) => {
         // State
         isCapturingLoop, setIsCapturingLoop,
         capturedImages, setCapturedImages,
-        maxPhotos, setMaxPhotos,
+        maxPhotos, setMaxPhotos: (num) => {
+            setMaxPhotos(num);
+            setTemplateImage(null); // Explicitly exit custom template mode
+        },
         timerDuration, setTimerDuration,
         countdown, setCountdown,
         retakeIndex, setRetakeIndex,
         startRetake,
         selectedDesign, setSelectedDesign,
-        bgColor, setBgColor: (color) => { setBgColor(color); addToRecents('color', color); },
+        bgColor, setBgColor: (color) => {
+            setBgColor(color);
+            if (dragRef.current) return; // Don't save if dragging (pan/resize) - though color picker doesn't use dragRef
+            // Debounce recents
+            if (colorTimeoutRef.current) clearTimeout(colorTimeoutRef.current);
+            colorTimeoutRef.current = setTimeout(() => {
+                addToRecents('color', color);
+            }, 1000);
+        },
+        addToRecents,
         bgImage, setBgImage,
         templateImage, setTemplateImage,
         showPreview, setShowPreview,
@@ -613,6 +867,7 @@ export const PhotoBoothProvider = ({ children }) => {
         layoutPaddingSide, setLayoutPaddingSide,
         layoutPaddingBottom, setLayoutPaddingBottom,
         photoRoundness, setPhotoRoundness,
+        isTemplateLocked, setIsTemplateLocked,
         textLayers: elements, setTextLayers: setElements, // Backward compat alias if needed, but better to use new names
         elements, setElements,
         selectedElementId, setSelectedElementId,
@@ -638,7 +893,15 @@ export const PhotoBoothProvider = ({ children }) => {
 
         // Donation Popup
         isDonationPopupOpen, setIsDonationPopupOpen,
-        donationStep, setDonationStep
+        donationStep, setDonationStep,
+
+        // Gallery
+        galleryImages, addToGallery, clearGallery,
+
+        // Undo/Redo
+        undo,
+        historyIndex,
+        canUndo: historyIndex > 0
     };
 
     return (

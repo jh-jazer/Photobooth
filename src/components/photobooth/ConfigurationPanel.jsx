@@ -2,7 +2,7 @@
 import React from 'react';
 import {
     ChevronDown, Trash2, Timer, Image as ImageIcon, Maximize2,
-    Upload, Save, FolderOpen, Plus, X, RotateCcw
+    Upload, Save, FolderOpen, Plus, X, RotateCcw, Lock, Unlock, Type
 } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 import { STRIP_DESIGNS } from '../../constants';
@@ -40,8 +40,9 @@ const ConfigurationPanel = ({ className = '' }) => {
         selectedSlotIndex, setSelectedSlotIndex,
         totalSlots,
         savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
-        recentColors, recentBgImages, recentTemplateImages, removeFromRecents, clearRecents,
-        showLayoutPrompt, setShowLayoutPrompt, confirmLayout
+        recentColors, recentBgImages, recentTemplateImages, addToRecents, removeFromRecents, clearRecents,
+        showLayoutPrompt, setShowLayoutPrompt, confirmLayout,
+        isTemplateLocked, setIsTemplateLocked,
     } = usePhotoBooth();
 
     const [newTemplateName, setNewTemplateName] = React.useState('');
@@ -62,11 +63,11 @@ const ConfigurationPanel = ({ className = '' }) => {
     ];
 
     return (
-        <div className={`flex flex-col h-full bg-zinc-950 border-l border-zinc-900 overflow-hidden ${className}`}>
+        <div className={`flex flex-col h-full bg-slate-950/80 backdrop-blur-xl border-l border-white/5 overflow-hidden ${className}`}>
             {/* Studio Config Header */}
-            <div className="p-6 border-b border-zinc-900 bg-zinc-950/50 backdrop-blur-sm z-10">
+            <div className="p-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-sm z-10">
 
-                <h2 className="text-sm ml-6 font-bold tracking-widest uppercase text-zinc-400">Customize Your Experience</h2>
+                <h2 className="text-sm ml-6 font-black tracking-tighter uppercase text-rose-500 drop-shadow-sm">Customize Your Experience</h2>
             </div>
 
             {/* Scrollable Settings Area */}
@@ -76,13 +77,22 @@ const ConfigurationPanel = ({ className = '' }) => {
                     <>
                         {/* Template Editor */}
                         <div className="group">
-                            <button
-                                onClick={() => toggleSection('template')}
-                                className="w-full flex items-center justify-between text-xs font-bold text-rose-500 uppercase tracking-widest hover:text-rose-400 transition-colors"
-                            >
-                                <span className="flex items-center gap-2"><Maximize2 size={14} /> Template Editor</span>
-                                <ChevronDown size={14} className={`transition-transform duration-300 ${activeSection === 'template' ? 'rotate-180' : ''}`} />
-                            </button>
+                            <div className="w-full flex items-center justify-between text-xs font-bold text-rose-500 uppercase tracking-widest transition-colors mb-2">
+                                <button
+                                    onClick={() => toggleSection('template')}
+                                    className="flex items-center gap-2 hover:text-rose-400"
+                                >
+                                    <Maximize2 size={14} /> Template Editor
+                                    <ChevronDown size={14} className={`transition-transform duration-300 ${activeSection === 'template' ? 'rotate-180' : ''}`} />
+                                </button>
+                                <button
+                                    onClick={() => setIsTemplateLocked(!isTemplateLocked)}
+                                    className={`p-1.5 rounded-lg transition-colors ${isTemplateLocked ? 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'}`}
+                                    title={isTemplateLocked ? "Unlock Editor" : "Lock Editor"}
+                                >
+                                    {isTemplateLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                                </button>
+                            </div>
                             {activeSection === 'template' && (
                                 <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                     {/* Top Padding Editor */}
@@ -94,12 +104,14 @@ const ConfigurationPanel = ({ className = '' }) => {
                                                     type="number"
                                                     value={layoutPaddingTop}
                                                     onChange={(e) => setLayoutPaddingTop(Number(e.target.value))}
-                                                    className="w-12 bg-zinc-900 border border-zinc-700 rounded p-0.5 text-center text-xs font-mono text-zinc-300 focus:border-rose-500 focus:outline-none"
+                                                    disabled={isTemplateLocked}
+                                                    className="w-12 bg-zinc-900 border border-zinc-700 rounded p-0.5 text-center text-xs font-mono text-zinc-300 focus:border-rose-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                                 <span className="text-[10px] text-zinc-600">px</span>
                                                 <button
                                                     onClick={() => setLayoutPaddingTop(15)}
-                                                    className="p-1 hover:bg-zinc-800 rounded-md text-zinc-500 hover:text-white transition-colors"
+                                                    disabled={isTemplateLocked}
+                                                    className="p-1 hover:bg-zinc-800 rounded-md text-zinc-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Reset to 15px"
                                                 >
                                                     <RotateCcw size={10} />
@@ -112,8 +124,32 @@ const ConfigurationPanel = ({ className = '' }) => {
                                             max="200"
                                             value={layoutPaddingTop}
                                             onChange={(e) => setLayoutPaddingTop(Number(e.target.value))}
-                                            className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                                            disabled={isTemplateLocked}
+                                            className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                         />
+                                    </div>
+
+                                    {/* Background Color */}
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 uppercase">
+                                            <span>Background Color</span>
+                                            <span className="font-mono text-zinc-400">{bgColor || 'None'}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="color"
+                                                value={bgColor || '#000000'}
+                                                onChange={(e) => setBgColor(e.target.value)}
+                                                className="h-10 w-10 bg-zinc-800 rounded-lg cursor-pointer border border-zinc-700 p-1"
+                                                title="Choose Background Color"
+                                            />
+                                            <button
+                                                onClick={() => setBgColor('')}
+                                                className="flex-1 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-400 hover:text-white rounded-lg transition-colors border border-transparent hover:border-zinc-600"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Image Spacer Editor */}
@@ -132,9 +168,23 @@ const ConfigurationPanel = ({ className = '' }) => {
                                                             y: i * (slot.h + (val - 2))
                                                         })));
                                                     }}
-                                                    className="w-12 bg-zinc-900 border border-zinc-700 rounded p-0.5 text-center text-xs font-mono text-zinc-300 focus:border-rose-500 focus:outline-none"
+                                                    disabled={isTemplateLocked}
+                                                    className="w-12 bg-zinc-900 border border-zinc-700 rounded p-0.5 text-center text-xs font-mono text-zinc-300 focus:border-rose-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                                 <span className="text-[10px] text-zinc-600">px</span>
+                                                <button
+                                                    onClick={() => {
+                                                        setLayoutGap(13);
+                                                        setCustomSlots(prev => prev.map((slot, i) => ({
+                                                            ...slot,
+                                                            y: i * (slot.h + (13 - 2))
+                                                        })));
+                                                    }}
+                                                    className="p-1 hover:bg-zinc-800 rounded-md text-zinc-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Reset to 13px"
+                                                    disabled={isTemplateLocked}>
+                                                    <RotateCcw size={10} />
+                                                </button>
                                             </div>
                                         </div>
                                         <input
@@ -150,7 +200,8 @@ const ConfigurationPanel = ({ className = '' }) => {
                                                     y: i * (slot.h + (val - 2))
                                                 })));
                                             }}
-                                            className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                                            disabled={isTemplateLocked}
+                                            className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                         />
                                     </div>
 
@@ -291,13 +342,17 @@ const ConfigurationPanel = ({ className = '' }) => {
                             <div className="flex gap-2">
                                 <button
                                     onClick={addTextElement}
-                                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    disabled={!!templateImage}
+                                    className={`flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${!!templateImage ? 'opacity-30 cursor-not-allowed hover:bg-zinc-800' : ''}`}
+                                    title={!!templateImage ? "Adding elements is disabled for custom templates" : "Add Text"}
                                 >
-                                    <Plus size={14} /> Add Text
+                                    <Type size={14} /> Add Text
                                 </button>
                                 <button
                                     onClick={() => stickerInputRef.current.click()}
-                                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    disabled={!!templateImage}
+                                    className={`flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${!!templateImage ? 'opacity-30 cursor-not-allowed hover:bg-zinc-800' : ''}`}
+                                    title={!!templateImage ? "Adding elements is disabled for custom templates" : "Add Sticker"}
                                 >
                                     <ImageIcon size={14} /> Add Sticker
                                 </button>
@@ -469,7 +524,7 @@ const ConfigurationPanel = ({ className = '' }) => {
                                     />
                                 </div>
                                 <div className="flex-1">
-                                    <span className="text-[10px] font-bold text-zinc-400 block uppercase tracking-wider">Custom Base Color</span>
+                                    <span className="text-[10px] font-bold text-zinc-400 block uppercase tracking-wider">Background Design</span>
                                     <span className="text-[10px] font-mono text-zinc-500">{bgColor || 'Using Preset'}</span>
                                 </div>
                                 {bgColor && (
@@ -483,20 +538,50 @@ const ConfigurationPanel = ({ className = '' }) => {
                                 )}
                             </div>
 
-                            {/* Recent Colors */}
-                            {recentColors.length > 0 && (
-                                <div className="flex gap-2 flex-wrap px-1">
-                                    {recentColors.map((color, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => setBgColor(color)}
-                                            className="w-6 h-6 rounded-full border border-zinc-800 shadow-sm hover:scale-110 hover:border-white transition-all focus:outline-none focus:ring-2 focus:ring-white/20"
-                                            style={{ backgroundColor: color }}
-                                            title={color}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+
+
+                            {/* Presets Grid */}
+                            <div className="grid grid-cols-5 gap-3">
+                                {/* Recent Colors (Max 2) */}
+                                {recentColors.slice(0, 2).map((color, i) => (
+                                    <button
+                                        key={`color-${i}`}
+                                        onClick={() => setBgColor(color)}
+                                        className={`aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${bgColor === color
+                                            ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110'
+                                            : 'border-zinc-800 hover:border-white'
+                                            }`}
+                                        style={{ backgroundColor: color }}
+                                        title={color}
+                                    />
+                                ))}
+
+                                {/* Recent Designs (First 2) */}
+                                {STRIP_DESIGNS.slice(0, 2).map(design => (
+                                    <button
+                                        key={design.id}
+                                        onClick={() => {
+                                            setSelectedDesign(design);
+                                            setBgColor(''); // Reset custom color when picking a preset
+                                            setBgImage(null); // Reset custom image
+                                            setTemplateImage(null); // Reset custom template
+                                        }}
+                                        className={`aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${selectedDesign.id === design.id && !bgColor && !bgImage && !templateImage
+                                            ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110'
+                                            : 'border-transparent ring-2 ring-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'
+                                            }`}
+                                        title={design.label}
+                                    >
+                                        <div className={`w-full h-full ${design.bg}`}></div>
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setShowAllDesigns(true)}
+                                    className="aspect-square rounded-full border-2 border-dashed border-zinc-700 hover:border-zinc-500 flex items-center justify-center transition-all bg-zinc-900/50 hover:bg-zinc-800"
+                                >
+                                    <Plus size={20} className="text-zinc-500" />
+                                </button>
+                            </div>
 
 
 
@@ -548,12 +633,18 @@ const ConfigurationPanel = ({ className = '' }) => {
                                             Clear All
                                         </button>
                                     </div>
-                                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar px-1">
+                                    <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar px-1">
                                         {recentTemplateImages.map((img, i) => img && (
-                                            <div key={i} className="relative group/recent flex-shrink-0 w-16 h-12">
+                                            <div key={i} className="relative group/recent flex-shrink-0 w-14 h-14">
                                                 <button
-                                                    onClick={() => setTemplateImage(img)}
-                                                    className="w-full h-full rounded-lg overflow-hidden border border-zinc-800 hover:border-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                    onClick={() => {
+                                                        setTemplateImage(img);
+                                                        setElements([]);
+                                                    }}
+                                                    className={`w-full h-full rounded-full overflow-hidden border-2 transition-all relative ${templateImage === img
+                                                        ? 'border-rose-500 ring-2 ring-rose-500/20 scale-110'
+                                                        : 'border-zinc-800 hover:border-white'
+                                                        }`}
                                                 >
                                                     <img src={img} alt="Recent" className="w-full h-full object-cover" />
                                                 </button>
@@ -573,32 +664,7 @@ const ConfigurationPanel = ({ className = '' }) => {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-5 gap-3">
-                                {STRIP_DESIGNS.slice(0, 4).map(design => (
-                                    <button
-                                        key={design.id}
-                                        onClick={() => {
-                                            setSelectedDesign(design);
-                                            setBgColor(''); // Reset custom color when picking a preset
-                                            setBgImage(null); // Reset custom image
-                                            setTemplateImage(null); // Reset custom template
-                                        }}
-                                        className={`aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${selectedDesign.id === design.id && !bgColor && !bgImage && !templateImage
-                                            ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110'
-                                            : 'border-transparent ring-2 ring-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'
-                                            }`}
-                                        title={design.label}
-                                    >
-                                        <div className={`w-full h-full ${design.bg}`}></div>
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => setShowAllDesigns(true)}
-                                    className="aspect-square rounded-full border-2 border-dashed border-zinc-700 hover:border-zinc-500 flex items-center justify-center transition-all bg-zinc-900/50 hover:bg-zinc-800"
-                                >
-                                    <Plus size={20} className="text-zinc-500" />
-                                </button>
-                            </div>
+
                         </div>
                     )}
                 </div>
@@ -619,7 +685,7 @@ const ConfigurationPanel = ({ className = '' }) => {
                     <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                                <ImageIcon size={20} className="text-rose-500" /> All Templates
+                                <ImageIcon size={20} className="text-rose-500" /> All Frames
                             </h3>
                             <button
                                 onClick={() => setShowAllDesigns(false)}
@@ -628,27 +694,63 @@ const ConfigurationPanel = ({ className = '' }) => {
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="overflow-y-auto custom-scrollbar grid grid-cols-4 sm:grid-cols-5 gap-4 p-2">
-                            {STRIP_DESIGNS.map(design => (
-                                <div key={design.id} className="flex flex-col items-center gap-2">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedDesign(design);
-                                            setBgColor('');
-                                            setBgImage(null);
-                                            setTemplateImage(null);
-                                            setShowAllDesigns(false);
-                                        }}
-                                        className={`w-full aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${selectedDesign.id === design.id && !bgColor && !bgImage && !templateImage
-                                            ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110 shadow-lg shadow-rose-500/20'
-                                            : 'border-transparent ring-2 ring-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'
-                                            }`}
-                                    >
-                                        <div className={`w-full h-full ${design.bg}`}></div>
-                                    </button>
-                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{design.label}</span>
+                        <div className="overflow-y-auto custom-scrollbar p-2 space-y-8">
+
+                            {/* Recent Colors Section */}
+                            {recentColors.length > 0 && (
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Recent Frames</h4>
+                                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
+                                        {recentColors.map((color, i) => (
+                                            <div key={i} className="flex flex-col items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setBgColor(color);
+                                                        setSelectedDesign({}); // Clear design selection
+                                                        setBgImage(null);
+                                                        setTemplateImage(null);
+                                                        setShowAllDesigns(false);
+                                                    }}
+                                                    className={`w-full aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${bgColor === color
+                                                        ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110 shadow-lg shadow-rose-500/20'
+                                                        : 'border-transparent ring-2 ring-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'
+                                                        }`}
+                                                    style={{ backgroundColor: color }}
+                                                >
+                                                </button>
+                                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider truncate w-full text-center">{color}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Preset Designs Section */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Preset Gradient</h4>
+                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
+                                    {STRIP_DESIGNS.map(design => (
+                                        <div key={design.id} className="flex flex-col items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDesign(design);
+                                                    setBgColor('');
+                                                    setBgImage(null);
+                                                    setTemplateImage(null);
+                                                    setShowAllDesigns(false);
+                                                }}
+                                                className={`w-full aspect-square rounded-full border-2 transition-all relative group overflow-hidden ${selectedDesign.id === design.id && !bgColor && !bgImage && !templateImage
+                                                    ? 'border-rose-500 ring-4 ring-rose-500/20 scale-110 shadow-lg shadow-rose-500/20'
+                                                    : 'border-transparent ring-2 ring-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'
+                                                    }`}
+                                            >
+                                                <div className={`w-full h-full ${design.bg}`}></div>
+                                            </button>
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{design.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -666,13 +768,19 @@ const ConfigurationPanel = ({ className = '' }) => {
                             {[1, 2, 3, 4].map(num => (
                                 <button
                                     key={num}
-                                    onClick={() => confirmLayout(num)}
-                                    className="aspect-[3/2] rounded-xl border-2 border-zinc-800 hover:border-rose-500 bg-zinc-900 hover:bg-zinc-800 transition-all flex flex-col items-center justify-center gap-2 group"
+                                    onClick={() => num === 4 && confirmLayout(num)}
+                                    disabled={num !== 4}
+                                    className={`aspect-[3/2] rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 group ${num !== 4
+                                        ? 'border-zinc-900 bg-zinc-950 opacity-50 cursor-not-allowed'
+                                        : 'border-zinc-800 hover:border-rose-500 bg-zinc-900 hover:bg-zinc-800 cursor-pointer'
+                                        }`}
                                 >
-                                    <span className="text-2xl font-bold text-white group-hover:bg-clip-text group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-rose-500 group-hover:to-purple-500 transition-all">
+                                    <span className={`text-2xl font-bold ${num !== 4 ? 'text-zinc-700' : 'text-white group-hover:bg-clip-text group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-rose-500 group-hover:to-purple-500'} transition-all`}>
                                         {num}
                                     </span>
-                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Frames</span>
+                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                        {num !== 4 ? 'Coming Soon' : 'Frames'}
+                                    </span>
                                 </button>
                             ))}
                         </div>

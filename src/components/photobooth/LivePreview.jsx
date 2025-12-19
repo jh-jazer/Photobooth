@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Maximize2, Plus, Minus } from 'lucide-react';
+import { Maximize2, Plus, Minus, Undo2 } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
 const LivePreview = ({ className = '' }) => {
@@ -28,7 +28,10 @@ const LivePreview = ({ className = '' }) => {
         isPanning,
         handleMouseDown,
         handleContainerMouseDown,
-        startRetake
+        startRetake,
+        isTemplateLocked,
+        undo,
+        canUndo
     } = usePhotoBooth();
 
     return (
@@ -46,29 +49,46 @@ const LivePreview = ({ className = '' }) => {
             >
 
                 {/* Live Preview & Zoom Controls */}
-                <div className="absolute bottom-6 flex items-center gap-3 bg-zinc-950/90 pl-4 p-1.5 rounded-full border border-zinc-800 backdrop-blur-md z-30 shadow-2xl">
-                    <div className="flex items-center gap-2 mr-2">
-                        <Maximize2 size={14} className="text-zinc-500" />
-                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Live Preview</span>
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 bg-slate-900/80 py-4 p-1.5 rounded-full border border-white/10 backdrop-blur-md z-30 shadow-2xl ring-1 ring-black/20">
+                    <div className="flex flex-col items-center gap-2 mb-1 group relative">
+                        <Maximize2 size={16} className="text-zinc-500 group-hover:text-rose-500 transition-colors" />
+                        <span className="absolute left-full ml-4 px-2 py-1 bg-black/90 text-[10px] font-bold text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            LIVE PREVIEW
+                        </span>
                     </div>
-                    <div className="h-4 w-px bg-zinc-800"></div>
-                    <div className="flex items-center gap-1">
+                    <div className="w-4 h-px bg-zinc-800"></div>
+                    <div className="flex flex-col items-center gap-1">
                         <button
-                            onClick={() => setPreviewScale(p => Math.max(0.2, p - 0.1))}
-                            className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+                            onClick={() => setPreviewScale(p => Math.min(1.5, p + 0.1))}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
                         >
-                            <Minus size={14} />
+                            <Plus size={16} />
                         </button>
-                        <span className="text-[10px] font-mono w-[3ch] text-center font-bold text-zinc-300">
+                        <span className="py-1 text-xs font-mono font-bold text-zinc-300">
                             {Math.round(previewScale * 100)}%
                         </span>
                         <button
-                            onClick={() => setPreviewScale(p => Math.min(1.5, p + 0.1))}
-                            className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+                            onClick={() => setPreviewScale(p => Math.max(0.2, p - 0.1))}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
                         >
-                            <Plus size={14} />
+                            <Minus size={16} />
                         </button>
                     </div>
+                    <div className="w-4 h-px bg-zinc-800"></div>
+                    <button
+                        onClick={undo}
+                        disabled={!canUndo}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors group relative ${canUndo
+                                ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white cursor-pointer'
+                                : 'text-zinc-700 cursor-not-allowed opacity-50'
+                            }`}
+                        title="Undo (Ctrl+Z)"
+                    >
+                        <Undo2 size={16} />
+                        <span className="absolute left-full ml-4 px-2 py-1 bg-black/90 text-[10px] font-bold text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            UNDO (Ctrl+Z)
+                        </span>
+                    </button>
                 </div>
 
                 <div className="relative shadow-2xl transition-transform duration-75 origin-center" style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewScale})` }}>
@@ -92,22 +112,26 @@ const LivePreview = ({ className = '' }) => {
                                 {customSlots.map((slot, i) => (
                                     <div
                                         key={slot.id}
-                                        onMouseDown={(e) => handleMouseDown(e, i)}
-                                        className={`absolute group ${selectedSlotIndex === i ? 'ring-2 ring-rose-500 z-10' : 'hover:ring-1 hover:ring-white/50'}`}
+                                        onMouseDown={(e) => {
+                                            if (!isTemplateLocked) {
+                                                handleMouseDown(e, i);
+                                            }
+                                        }}
+                                        className={`absolute group ${selectedSlotIndex === i && !isTemplateLocked ? 'ring-2 ring-rose-500 z-10' : ''} ${!isTemplateLocked ? 'hover:ring-1 hover:ring-white/50' : ''}`}
                                         style={{
                                             left: `${slot.x}px`,
                                             top: `${slot.y}px`,
                                             width: `${slot.w}px`,
                                             height: `${slot.h}px`,
-                                            cursor: 'pointer' // Changed to pointer
+                                            cursor: isTemplateLocked ? 'default' : 'move'
                                         }}
                                         onClick={(e) => {
-                                            // Actually, since we have handleMouseDown separately, we can rely on a simple click.
-                                            // But dragging might trigger click. Let's make it simple: Double click to retake?
-                                            // Or just Click. The user expects "click a photo".
-                                            // But dragging also starts with mousedown.
-                                            // Let's use a small helper or just assume click is fine if no drag occurred.
-                                            // For now, let's just use onClick and see if it conflicts.
+                                            // Provide retake functionality even if locked?
+                                            // User request was "when locked I should not be able to move".
+                                            // Retake is a functional action, "Moving" is a layout action.
+                                            // Usually "Locked" means "Layout Locked", functionality remains.
+                                            // So clicking to retake should arguably still work, OR maybe not if it interferes.
+                                            // Let's allow click actions (startRetake) but disable drag.
                                             startRetake(i);
                                         }}
                                     >
@@ -116,14 +140,14 @@ const LivePreview = ({ className = '' }) => {
                                             {capturedImages[i] ? (
                                                 <img src={capturedImages[i]} className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full bg-black/20 flex items-center justify-center border-2 border-dashed border-white/20">
-                                                    <span className="text-xs font-bold text-white/50">{i + 1}</span>
+                                                <div className="w-full h-full bg-zinc-500/20 flex items-center justify-center border-2 border-dashed border-zinc-500/50">
+                                                    <span className="text-xs font-bold text-white drop-shadow-md">{i + 1}</span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Resize Handles */}
-                                        {selectedSlotIndex === i && (
+                                        {/* Resize Handles - Only if NOT locked */}
+                                        {selectedSlotIndex === i && !isTemplateLocked && (
                                             <>
                                                 <div onMouseDown={(e) => handleMouseDown(e, i, 'nw')} className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-rose-500 rounded-full cursor-nw-resize z-20 shadow-sm hover:scale-125 transition-transform"></div>
                                                 <div onMouseDown={(e) => handleMouseDown(e, i, 'ne')} className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-rose-500 rounded-full cursor-ne-resize z-20 shadow-sm hover:scale-125 transition-transform"></div>
@@ -140,7 +164,7 @@ const LivePreview = ({ className = '' }) => {
                                     <div
                                         key={i}
                                         onClick={() => capturedImages[i] && startRetake(i)}
-                                        className={`relative shrink-0 overflow-hidden aspect-[3/2] ${selectedDesign.border} w-full ${capturedImages[i] ? 'border-2 cursor-pointer hover:ring-2 hover:ring-rose-500 transition-all' : 'border-2 border-dashed opacity-30 bg-black/5'}`}
+                                        className={`relative shrink-0 overflow-hidden aspect-[3/2] ${selectedDesign.border} w-full ${capturedImages[i] ? 'border-2 cursor-pointer hover:ring-2 hover:ring-rose-500 transition-all' : 'border-2 border-dashed border-zinc-500/50 bg-zinc-500/10'}`}
                                         style={{ borderRadius: `${photoRoundness}px`, overflow: 'hidden' }}
                                     >
                                         {capturedImages[i] && <img src={capturedImages[i]} className="w-full h-full object-cover" />}

@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp, SwitchCamera } from 'lucide-react';
+import { ArrowRight, Play, Pause, Timer, Upload, Trash2, Printer, Download, Clock, Camera, ChevronUp, SwitchCamera, Image } from 'lucide-react';
 import { usePhotoBooth } from './PhotoBoothContext';
 
-const CaptureStation = ({ className = '' }) => {
+const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
     const {
         webcamRef,
         isCapturingLoop, setIsCapturingLoop,
@@ -79,9 +79,11 @@ const CaptureStation = ({ className = '' }) => {
     };
 
     return (
-        <div className={`relative bg-black flex flex-col items-center justify-center p-8 overflow-hidden ${className}`}>
+        <div className={`relative bg-slate-950 flex flex-col items-center justify-center p-8 overflow-hidden ${className}`}>
+            {/* Background Glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-tr from-rose-500/20 to-purple-500/20 rounded-full blur-[100px] pointer-events-none mix-blend-screen animate-pulse"></div>
             {/* Webcam Feed */}
-            <div className="relative w-full aspect-[4/3] bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group max-h-[80vh]">
+            <div className="relative w-full aspect-[4/3] bg-slate-900/50 backdrop-blur-3xl rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 group max-h-[80vh] z-10 border-8 border-white/20">
                 <Webcam
                     audio={false}
                     ref={webcamRef}
@@ -169,12 +171,13 @@ const CaptureStation = ({ className = '' }) => {
                             {[1, 2, 3, 4].map(num => (
                                 <button
                                     key={num}
-                                    onClick={() => setMaxPhotos(num)}
+                                    onClick={() => num === 4 && setMaxPhotos(num)}
+                                    disabled={num !== 4}
                                     className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${maxPhotos === num
                                         ? 'bg-zinc-700 text-white shadow-lg'
                                         : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                                        }`}
-                                    title={`Set Layout to ${num} Frames`}
+                                        } ${num !== 4 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    title={num !== 4 ? 'Coming Soon' : `Set Layout to ${num} Frames`}
                                 >
                                     <span className="text-xs font-bold">{num}</span>
                                     <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
@@ -236,20 +239,13 @@ const CaptureStation = ({ className = '' }) => {
                     {!isCapturingLoop && capturedImages.length >= totalSlots && (
                         <div className="flex gap-4 w-full max-w-md justify-center">
                             <button
-                                onClick={() => {
-                                    if (window.innerWidth < 1024) {
-                                        setShowPreview(true);
-                                        setTimeout(printStrip, 500);
-                                    } else {
-                                        printStrip();
-                                    }
-                                }}
-                                className="flex-1 relative group overflow-hidden py-4 rounded-2xl bg-white text-black font-bold uppercase tracking-wider shadow-lg shadow-white/5 transition-all hover:shadow-white/20 hover:scale-[1.05] active:scale-[0.98]"
+                                onClick={() => setShowGallery && setShowGallery(true)}
+                                className="flex-1 relative group overflow-hidden h-14 flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-indigo-900/40 transition-all hover:shadow-indigo-900/60 hover:scale-[1.05] active:scale-[0.98]"
                             >
-                                <div className="absolute inset-0 bg-gradient-to-b from-zinc-100 to-zinc-300 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
                                 <div className="flex items-center justify-center gap-2 relative z-10">
-                                    <span>Print</span>
-                                    <Printer size={18} className="text-black group-hover:scale-110 transition-transform duration-300" />
+                                    <span>Gallery</span>
                                 </div>
                             </button>
 
@@ -294,7 +290,7 @@ const CaptureStation = ({ className = '' }) => {
 
                                 <button
                                     onClick={() => setSaveMenuOpen(!saveMenuOpen)}
-                                    className="w-full relative group overflow-hidden py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold uppercase tracking-wider shadow-lg shadow-rose-900/40 transition-all hover:shadow-rose-900/60 hover:scale-[1.05] active:scale-[0.98]"
+                                    className="w-full relative group overflow-hidden h-14 flex items-center justify-center rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-rose-900/40 transition-all hover:shadow-rose-900/60 hover:scale-[1.05] active:scale-[0.98]"
                                 >
                                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
