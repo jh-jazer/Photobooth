@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -17,6 +16,7 @@ export const PhotoBoothProvider = ({ children }) => {
     const [maxPhotos, setMaxPhotos] = useState(3);
     const [timerDuration, setTimerDuration] = useState(3);
     const [countdown, setCountdown] = useState(null);
+    const [retakeIndex, setRetakeIndex] = useState(null);
 
     // Design State
     const [selectedDesign, setSelectedDesign] = useState(STRIP_DESIGNS[0]);
@@ -29,33 +29,38 @@ export const PhotoBoothProvider = ({ children }) => {
     const [showConfig, setShowConfig] = useState(false);
 
     // Layout State (Custom)
-    const [layoutGap, setLayoutGap] = useState(12);
-    const [layoutPaddingTop, setLayoutPaddingTop] = useState(8);
-    const [layoutPaddingSide, setLayoutPaddingSide] = useState(8);
-    const [layoutPaddingBottom, setLayoutPaddingBottom] = useState(8);
+    const [layoutGap, setLayoutGap] = useState(18);
+    const [layoutPaddingTop, setLayoutPaddingTop] = useState(15);
+    const [layoutPaddingSide, setLayoutPaddingSide] = useState(15);
+    const [layoutPaddingBottom, setLayoutPaddingBottom] = useState(90);
     const [photoRoundness, setPhotoRoundness] = useState(0);
 
-    // Text Layers State
-    const [textLayers, setTextLayers] = useState([]);
-    const [selectedTextId, setSelectedTextId] = useState(null);
+    // Elements State (Text & Stickers)
+    const [elements, setElements] = useState([]);
+    const [selectedElementId, setSelectedElementId] = useState(null);
 
     // Custom Template Slots
     const [customSlots, setCustomSlots] = useState([
-        { id: 1, x: 20, y: 80, w: 200, h: 150 },
-        { id: 2, x: 20, y: 240, w: 200, h: 150 },
-        { id: 3, x: 20, y: 400, w: 200, h: 150 },
+        { id: 1, x: 0, y: 0, w: 210, h: 120 },
+        { id: 2, x: 0, y: 136, w: 210, h: 120 }, // 120 + (18-2) gap
+        { id: 3, x: 0, y: 272, w: 210, h: 120 },
     ]);
     const [selectedSlotIndex, setSelectedSlotIndex] = useState(null);
     const [stripHeight, setStripHeight] = useState(640);
 
     // Preview & Interaction State
-    const [previewScale, setPreviewScale] = useState(0.55);
+    const [previewScale, setPreviewScale] = useState(0.85);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
 
     // Donation Popup State
     const [isDonationPopupOpen, setIsDonationPopupOpen] = useState(false);
     const [donationStep, setDonationStep] = useState('prompt'); // 'prompt' | 'qr'
+
+    // Layout Prompt State
+    const [showLayoutPrompt, setShowLayoutPrompt] = useState(false);
+    const [pendingTemplateImage, setPendingTemplateImage] = useState(null);
+    const [pendingStripHeight, setPendingStripHeight] = useState(0);
 
     // --- REFS ---
     const webcamRef = useRef(null);
@@ -103,8 +108,8 @@ export const PhotoBoothProvider = ({ children }) => {
             config: {
                 selectedDesign, bgColor, bgImage, templateImage,
                 layoutGap, layoutPaddingTop, layoutPaddingSide, layoutPaddingBottom, photoRoundness,
-                headerText, headerFont, headerSize, headerTracking,
-                footerText, footerFont, footerSize, footerOffsetY, footerTracking,
+                layoutGap, layoutPaddingTop, layoutPaddingSide, layoutPaddingBottom, photoRoundness,
+                elements,
                 customSlots, stripHeight
             }
         };
@@ -130,7 +135,9 @@ export const PhotoBoothProvider = ({ children }) => {
         }
         if (c.photoRoundness !== undefined) setPhotoRoundness(c.photoRoundness);
 
-        if (c.textLayers !== undefined) setTextLayers(c.textLayers);
+        if (c.elements !== undefined) setElements(c.elements);
+        // Fallback for older saves
+        if (c.textLayers !== undefined && !c.elements) setElements(c.textLayers.map(l => ({ ...l, type: 'text' })));
 
         if (c.customSlots !== undefined) setCustomSlots(c.customSlots);
         if (c.stripHeight !== undefined) setStripHeight(c.stripHeight);
@@ -140,10 +147,11 @@ export const PhotoBoothProvider = ({ children }) => {
         setSavedTemplates(prev => prev.filter(t => t.id !== id));
     };
 
-    const addTextLayer = () => {
+    const addTextElement = () => {
         const id = Date.now();
-        setTextLayers(prev => [...prev, {
+        setElements(prev => [...prev, {
             id,
+            type: 'text',
             text: 'Add Text',
             x: 50, y: 50,
             fontFamily: 'font-sans',
@@ -153,16 +161,34 @@ export const PhotoBoothProvider = ({ children }) => {
             tracking: 'tracking-normal',
             rotation: 0
         }]);
-        setSelectedTextId(id);
+        setSelectedElementId(id);
     };
 
-    const updateTextLayer = (id, updates) => {
-        setTextLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+    const addImageElement = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const id = Date.now();
+            setElements(prev => [...prev, {
+                id,
+                type: 'image',
+                src: e.target.result,
+                x: 50, y: 50,
+                width: 100, // Default width
+                rotation: 0
+            }]);
+            setSelectedElementId(id);
+        };
+        reader.readAsDataURL(file);
     };
 
-    const deleteTextLayer = (id) => {
-        setTextLayers(prev => prev.filter(l => l.id !== id));
-        if (selectedTextId === id) setSelectedTextId(null);
+    const updateElement = (id, updates) => {
+        setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
+    };
+
+    const deleteElement = (id) => {
+        setElements(prev => prev.filter(el => el.id !== id));
+        if (selectedElementId === id) setSelectedElementId(null);
     };
 
     const addToRecents = (type, value) => {
@@ -177,6 +203,26 @@ export const PhotoBoothProvider = ({ children }) => {
         }
     };
 
+    const removeFromRecents = (type, value) => {
+        if (type === 'color') {
+            setRecentColors(prev => prev.filter(c => c !== value));
+        } else if (type === 'bgImage') {
+            setRecentBgImages(prev => prev.filter(i => i !== value));
+        } else if (type === 'templateImage') {
+            setRecentTemplateImages(prev => prev.filter(i => i !== value));
+        }
+    };
+
+    const clearRecents = (type) => {
+        if (type === 'templateImage') {
+            setRecentTemplateImages([]);
+        } else if (type === 'bgImage') {
+            setRecentBgImages([]);
+        } else if (type === 'color') {
+            setRecentColors([]);
+        }
+    };
+
     // --- LOGIC ---
 
     const totalSlots = templateImage ? customSlots.length : maxPhotos;
@@ -185,6 +231,13 @@ export const PhotoBoothProvider = ({ children }) => {
         const imageSrc = webcamRef.current.getScreenshot();
         if (imageSrc) {
             setCapturedImages(prev => {
+                if (retakeIndex !== null) {
+                    const newImages = [...prev];
+                    newImages[retakeIndex] = imageSrc;
+                    setIsCapturingLoop(false); // Stop immediately after retake
+                    setRetakeIndex(null); // Reset retake index
+                    return newImages;
+                }
                 const newImages = [...prev, imageSrc];
                 if (newImages.length >= totalSlots) {
                     setIsCapturingLoop(false);
@@ -192,7 +245,14 @@ export const PhotoBoothProvider = ({ children }) => {
                 return newImages;
             });
         }
-    }, [totalSlots]);
+    }, [totalSlots, retakeIndex]);
+
+    const startRetake = (index) => {
+        setRetakeIndex(index);
+        setShowPreview(false); // Optionally hide preview to show capture station
+        setIsCapturingLoop(false); // Ensure we are not looping
+        setCountdown(null);
+    };
 
     // Capture Loop
     useEffect(() => {
@@ -294,16 +354,50 @@ export const PhotoBoothProvider = ({ children }) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const result = e.target.result;
-            setTemplateImage(result);
-            addToRecents('templateImage', result);
+
+            // Create image to get dimensions and update layout
+            const img = new Image();
+            img.onload = () => {
+                // Calculate height based on fixed 240px width to maintain aspect ratio
+                const aspect = img.height / img.width;
+                const newHeight = Math.round(240 * aspect);
+
+                setPendingStripHeight(newHeight);
+                setPendingTemplateImage(result);
+                setShowLayoutPrompt(true);
+            };
+            img.src = result;
         };
         reader.readAsDataURL(file);
         event.target.value = '';
     };
 
+    const confirmLayout = (numFrames) => {
+        setMaxPhotos(numFrames);
+        setStripHeight(pendingStripHeight);
+        setTemplateImage(pendingTemplateImage);
+        addToRecents('templateImage', pendingTemplateImage);
+        setLayoutPaddingTop(15);
+
+        // Generate N slots centered
+        const newSlots = Array.from({ length: numFrames }, (_, i) => ({
+            id: Date.now() + i,
+            x: 0, // Centered (considering padding logic)
+            y: 0 + (i * 136), // Start at 0, 120h + (18-2) gap
+            w: 210,
+            h: 120
+        }));
+        setCustomSlots(newSlots);
+
+        // Reset Pending
+        setPendingTemplateImage(null);
+        setPendingStripHeight(0);
+        setShowLayoutPrompt(false);
+    };
     const retake = () => {
         setCapturedImages([]);
         setIsCapturingLoop(false);
+        setRetakeIndex(null);
         setCountdown(null);
     };
 
@@ -400,11 +494,11 @@ export const PhotoBoothProvider = ({ children }) => {
         const deltaX = (e.clientX - startX) / scale;
         const deltaY = (e.clientY - startY) / scale;
 
-        if (type === 'text') {
-            setTextLayers(prev => prev.map(l => {
-                if (l.id !== id) return l;
+        if (type === 'element') {
+            setElements(prev => prev.map(el => {
+                if (el.id !== id) return el;
                 return {
-                    ...l,
+                    ...el,
                     x: Math.round(startLayer.x + deltaX),
                     y: Math.round(startLayer.y + deltaY)
                 };
@@ -464,20 +558,20 @@ export const PhotoBoothProvider = ({ children }) => {
         document.addEventListener('mouseup', handleGlobalMouseUp);
     };
 
-    const handleTextMouseDown = (e, id) => {
+    const handleElementMouseDown = (e, id) => {
         if (e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        setSelectedTextId(id);
-        const layer = textLayers.find(l => l.id === id);
-        if (!layer) return;
+        setSelectedElementId(id);
+        const element = elements.find(el => el.id === id);
+        if (!element) return;
 
         dragRef.current = {
-            type: 'text',
+            type: 'element',
             id,
             startX: e.clientX,
             startY: e.clientY,
-            startLayer: { ...layer }
+            startLayer: { ...element }
         };
         document.addEventListener('mousemove', handleGlobalMouseMove);
         document.addEventListener('mouseup', handleGlobalMouseUp);
@@ -506,6 +600,8 @@ export const PhotoBoothProvider = ({ children }) => {
         maxPhotos, setMaxPhotos,
         timerDuration, setTimerDuration,
         countdown, setCountdown,
+        retakeIndex, setRetakeIndex,
+        startRetake,
         selectedDesign, setSelectedDesign,
         bgColor, setBgColor: (color) => { setBgColor(color); addToRecents('color', color); },
         bgImage, setBgImage,
@@ -517,9 +613,10 @@ export const PhotoBoothProvider = ({ children }) => {
         layoutPaddingSide, setLayoutPaddingSide,
         layoutPaddingBottom, setLayoutPaddingBottom,
         photoRoundness, setPhotoRoundness,
-        textLayers, setTextLayers,
-        selectedTextId, setSelectedTextId,
-        addTextLayer, updateTextLayer, deleteTextLayer,
+        textLayers: elements, setTextLayers: setElements, // Backward compat alias if needed, but better to use new names
+        elements, setElements,
+        selectedElementId, setSelectedElementId,
+        addTextElement, addImageElement, updateElement, deleteElement,
         customSlots, setCustomSlots,
         selectedSlotIndex, setSelectedSlotIndex,
         stripHeight, setStripHeight,
@@ -531,12 +628,13 @@ export const PhotoBoothProvider = ({ children }) => {
         // Handlers
         capture, retake, handleFileUpload, handleBgUpload, handleTemplateUpload,
         downloadStrip, printStrip,
-        handleMouseDown, handleTextMouseDown, handleContainerMouseDown,
+        handleMouseDown, handleElementMouseDown, handleContainerMouseDown,
+        showLayoutPrompt, setShowLayoutPrompt, confirmLayout, pendingTemplateImage,
         totalSlots, // Expose derived value
 
         // Saved & Recents
         savedTemplates, saveTemplate, loadTemplate, deleteTemplate,
-        recentColors, recentBgImages, recentTemplateImages,
+        recentColors, recentBgImages, recentTemplateImages, addToRecents, removeFromRecents, clearRecents,
 
         // Donation Popup
         isDonationPopupOpen, setIsDonationPopupOpen,

@@ -25,7 +25,7 @@ const PhotoBoothContent = () => {
     };
 
     return (
-        <div className="h-screen w-full flex flex-col lg:grid lg:grid-cols-12 bg-zinc-950 text-white overflow-hidden font-sans selection:bg-rose-500/30">
+        <div className="h-screen w-full flex flex-col lg:grid lg:grid-cols-12 lg:grid-rows-1 bg-zinc-950 text-white overflow-hidden font-sans selection:bg-rose-500/30">
             {/* Mobile Header */}
             <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-zinc-950 border-b border-zinc-900 z-50 shrink-0">
                 <button
@@ -37,7 +37,7 @@ const PhotoBoothContent = () => {
 
                 <div className="flex items-center gap-2 font-bold uppercase tracking-widest text-sm text-zinc-300">
                     <Camera size={16} className="text-rose-500" />
-                    <span>Studio Booth</span>
+                    <span>Potobooth</span>
                 </div>
 
                 <button
@@ -52,7 +52,7 @@ const PhotoBoothContent = () => {
             <LivePreview
                 className={`
                     ${showPreview ? 'fixed inset-0 z-40 bg-zinc-950 pt-20 flex flex-col' : 'fixed top-0 left-[-200vw] h-0 overflow-hidden opacity-0 pointer-events-none flex flex-col'} 
-                    lg:flex lg:static lg:col-span-3 lg:pt-8 lg:bg-transparent lg:h-auto lg:overflow-visible lg:opacity-100 lg:pointer-events-auto
+                    lg:flex lg:static lg:col-span-3 lg:pt-8 lg:bg-transparent lg:overflow-hidden lg:opacity-100 lg:pointer-events-auto lg:h-full
                 `}
             />
 

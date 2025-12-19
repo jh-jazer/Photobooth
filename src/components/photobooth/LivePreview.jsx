@@ -17,9 +17,9 @@ const LivePreview = ({ className = '' }) => {
         layoutPaddingSide,
         layoutPaddingBottom,
         photoRoundness,
-        textLayers,
-        selectedTextId,
-        handleTextMouseDown,
+        elements,
+        selectedElementId,
+        handleElementMouseDown,
         customSlots,
         selectedSlotIndex,
         stripHeight,
@@ -27,12 +27,14 @@ const LivePreview = ({ className = '' }) => {
         panOffset,
         isPanning,
         handleMouseDown,
-        handleContainerMouseDown
+        handleContainerMouseDown,
+        startRetake
     } = usePhotoBooth();
 
     return (
         <div className={`flex items-center justify-center p-8 relative overflow-hidden border-r border-zinc-900 bg-transparent ${className}`}>
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+
 
 
 
@@ -97,7 +99,16 @@ const LivePreview = ({ className = '' }) => {
                                             top: `${slot.y}px`,
                                             width: `${slot.w}px`,
                                             height: `${slot.h}px`,
-                                            cursor: 'move'
+                                            cursor: 'pointer' // Changed to pointer
+                                        }}
+                                        onClick={(e) => {
+                                            // Actually, since we have handleMouseDown separately, we can rely on a simple click.
+                                            // But dragging might trigger click. Let's make it simple: Double click to retake?
+                                            // Or just Click. The user expects "click a photo".
+                                            // But dragging also starts with mousedown.
+                                            // Let's use a small helper or just assume click is fine if no drag occurred.
+                                            // For now, let's just use onClick and see if it conflicts.
+                                            startRetake(i);
                                         }}
                                     >
                                         {/* Inner Content (Clipped) */}
@@ -128,61 +139,55 @@ const LivePreview = ({ className = '' }) => {
                                 {[...Array(maxPhotos)].map((_, i) => (
                                     <div
                                         key={i}
-                                        className={`relative shrink-0 ${selectedDesign.id === 'polaroid-teal' ? 'bg-white shadow-sm text-black' : `overflow-hidden aspect-[3/2] ${selectedDesign.border}`} w-full ${capturedImages[i] ? (selectedDesign.id === 'polaroid-teal' ? '' : 'border-2') : (selectedDesign.id === 'polaroid-teal' ? 'bg-white opacity-50' : 'border-2 border-dashed opacity-30 bg-black/5')}`}
+                                        onClick={() => capturedImages[i] && startRetake(i)}
+                                        className={`relative shrink-0 overflow-hidden aspect-[3/2] ${selectedDesign.border} w-full ${capturedImages[i] ? 'border-2 cursor-pointer hover:ring-2 hover:ring-rose-500 transition-all' : 'border-2 border-dashed opacity-30 bg-black/5'}`}
                                         style={{ borderRadius: `${photoRoundness}px`, overflow: 'hidden' }}
                                     >
-
-                                        {/* Polaroid Special Wrapper */}
-                                        {selectedDesign.id === 'polaroid-teal' ? (
-                                            <div className={`flex flex-col h-full ${i === 0 ? 'pt-2 px-2 pb-8' : 'p-2'}`}>
-                                                {/* Initials Tag (Top Gen Only) */}
-                                                {i === 0 && (
-                                                    <div className="absolute top-2 right-2 bg-transparent text-[#00798c] font-black text-[10px] z-10 tracking-tighter">
-                                                        JJ
-                                                    </div>
-                                                )}
-
-                                                {/* Image Area */}
-                                                <div className="w-full h-full bg-zinc-100 overflow-hidden relative">
-                                                    {capturedImages[i] ? (
-                                                        <img src={capturedImages[i]} className="w-full h-full object-cover transform rotate-0" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
-                                                            <ImageIcon size={16} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            capturedImages[i] && <img src={capturedImages[i]} className="w-full h-full object-cover" />
-                                        )}
+                                        {capturedImages[i] && <img src={capturedImages[i]} className="w-full h-full object-cover" />}
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* Text Layers */}
-                        {textLayers.map(layer => (
+                        {/* Generic Elements (Text & Images) */}
+                        {elements.map(el => (
                             <div
-                                key={layer.id}
-                                onMouseDown={(e) => handleTextMouseDown(e, layer.id)}
-                                className={`absolute z-40 cursor-move select-none whitespace-nowrap ${layer.fontFamily} ${layer.tracking} ${selectedTextId === layer.id ? 'ring-1 ring-rose-500 bg-black/10' : 'hover:ring-1 hover:ring-white/30'}`}
+                                key={el.id}
+                                onMouseDown={(e) => handleElementMouseDown(e, el.id)}
+                                className={`absolute z-40 cursor-move select-none ${selectedElementId === el.id ? 'ring-1 ring-rose-500 bg-black/10' : 'hover:ring-1 hover:ring-white/30'}`}
                                 style={{
-                                    left: `${layer.x}px`,
-                                    top: `${layer.y}px`,
-                                    fontSize: `${layer.fontSize}px`,
-                                    color: layer.color,
-                                    transform: `rotate(${layer.rotation || 0}deg)`,
-                                    fontWeight: layer.fontWeight || 'bold',
+                                    left: `${el.x}px`,
+                                    top: `${el.y}px`,
+                                    transform: `rotate(${el.rotation || 0}deg)`,
+                                    width: el.type === 'image' ? `${el.width}px` : undefined,
                                 }}
                             >
-                                {layer.text}
+                                {el.type === 'text' ? (
+                                    <span
+                                        className={`whitespace-nowrap ${el.fontFamily?.startsWith('font-') ? el.fontFamily : ''} ${el.tracking}`}
+                                        style={{
+                                            fontSize: `${el.fontSize}px`,
+                                            color: el.color,
+                                            fontWeight: el.fontWeight || 'bold',
+                                            fontFamily: el.fontFamily?.startsWith('font-') ? undefined : el.fontFamily,
+                                        }}
+                                    >
+                                        {el.text}
+                                    </span>
+                                ) : (
+                                    <img
+                                        src={el.src}
+                                        alt="sticker"
+                                        className="w-full h-auto pointer-events-none"
+                                        draggable={false} // Prevent browser native drag
+                                    />
+                                )}
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

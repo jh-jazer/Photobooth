@@ -20,7 +20,10 @@ const CaptureStation = ({ className = '' }) => {
         downloadStrip,
         printStrip,
         capture,
-        setShowPreview // Added to control preview visibility manually
+        setShowPreview,
+        retakeIndex,
+        setRetakeIndex,
+        setMaxPhotos
     } = usePhotoBooth();
 
     const [devices, setDevices] = useState([]);
@@ -101,7 +104,7 @@ const CaptureStation = ({ className = '' }) => {
 
                     {/* Camera Switcher (Top Left) */}
                     {devices.length > 1 && !isCapturingLoop && (
-                        <div className="absolute top-6 left-6 z-30">
+                        <div className="absolute top-6 left-6 z-30 pointer-events-auto">
                             <button
                                 onClick={switchCamera}
                                 className="bg-black/40 text-white/70 hover:text-white hover:bg-black/60 p-2 rounded-full backdrop-blur-sm transition-all border border-white/10"
@@ -112,11 +115,11 @@ const CaptureStation = ({ className = '' }) => {
                         </div>
                     )}
 
-                    {/* Rec Indicator */}
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-4 py-1.5 rounded-full">
-                        <div className={`w-2 h-2 rounded-full bg-red-500 ${isCapturingLoop ? 'animate-pulse' : ''}`}></div>
-                        <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase">
-                            {isCapturingLoop ? 'REC' : 'STANDBY'}
+                    {/* Rec / Retake Indicator */}
+                    <div className={`absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 backdrop-blur-md px-4 py-1.5 rounded-full ${retakeIndex !== null ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+                        <div className={`w-2 h-2 rounded-full ${retakeIndex !== null ? 'bg-amber-500' : 'bg-red-500'} ${isCapturingLoop ? 'animate-pulse' : ''}`}></div>
+                        <span className={`text-[10px] font-bold tracking-widest uppercase ${retakeIndex !== null ? 'text-amber-400' : 'text-red-400'}`}>
+                            {retakeIndex !== null ? `RETAKING PHOTO ${retakeIndex + 1}` : (isCapturingLoop ? 'REC' : 'STANDBY')}
                         </span>
                     </div>
 
@@ -159,14 +162,35 @@ const CaptureStation = ({ className = '' }) => {
 
             {/* Controls */}
             <div className="mt-8 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 items-center px-4 lg:px-12 z-20 gap-8 lg:gap-0">
-                {/* Left: Spacer (Hidden on Mobile) */}
-                <div className="hidden lg:block justify-self-start w-12"></div>
+                {/* Left: Duplicate Timer Settings (Desktop Only) */}
+                <div className="hidden lg:flex justify-self-start relative">
+                    {!isCapturingLoop && capturedImages.length < totalSlots && (
+                        <div className="bg-zinc-900/80 backdrop-blur-sm rounded-full p-1 border border-zinc-800 h-[50px] flex items-center">
+                            {[1, 2, 3, 4].map(num => (
+                                <button
+                                    key={num}
+                                    onClick={() => setMaxPhotos(num)}
+                                    className={`w-10 h-full rounded-full flex flex-col items-center justify-center transition-all ${maxPhotos === num
+                                        ? 'bg-zinc-700 text-white shadow-lg'
+                                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                        }`}
+                                    title={`Set Layout to ${num} Frames`}
+                                >
+                                    <span className="text-xs font-bold">{num}</span>
+                                    <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">
+                                        FRM
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 {/* Center: Main Primary Action */}
                 <div className="justify-self-center flex flex-col items-center gap-6 relative">
 
                     {/* Main Capture / Pause / Save Controls */}
-                    {!isCapturingLoop && capturedImages.length < totalSlots && (
+                    {!isCapturingLoop && (capturedImages.length < totalSlots || retakeIndex !== null) && (
                         <button
                             onClick={() => {
                                 if (timerDuration === 0) {
@@ -307,6 +331,15 @@ const CaptureStation = ({ className = '' }) => {
                                         <span>Restart</span>
                                     </button>
                                 </>
+                            )}
+                            {/* Cancel Retake */}
+                            {retakeIndex !== null && !isCapturingLoop && (
+                                <button
+                                    onClick={() => setRetakeIndex(null)}
+                                    className="absolute -bottom-12 text-xs font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest"
+                                >
+                                    Cancel Retake
+                                </button>
                             )}
                         </div>
                     )}
