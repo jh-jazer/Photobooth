@@ -618,10 +618,41 @@ export const PhotoBoothProvider = ({ children }) => {
                 // Auto-save to gallery
                 addToGallery(dataUrl);
 
-                const link = document.createElement('a');
-                link.download = filename;
-                link.href = dataUrl;
-                link.click();
+                // Mobile-compatible download
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+                if (isMobile) {
+                    // For mobile: open in new window so user can long-press to save
+                    const newWindow = window.open();
+                    if (newWindow) {
+                        newWindow.document.write(`
+                            <html>
+                                <head>
+                                    <title>Save Image</title>
+                                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                                    <style>
+                                        body { margin: 0; padding: 20px; background: #000; text-align: center; }
+                                        img { max-width: 100%; height: auto; }
+                                        p { color: #fff; font-family: sans-serif; margin-top: 20px; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <img src="${dataUrl}" alt="Photo Strip">
+                                    <p>Long press the image above and select "Save Image" or "Download Image"</p>
+                                </body>
+                            </html>
+                        `);
+                        newWindow.document.close();
+                    }
+                } else {
+                    // For desktop: use standard download
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
             }
 
             // Show donation popup on success

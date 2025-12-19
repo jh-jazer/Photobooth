@@ -134,15 +134,6 @@ function App() {
                     </div>
                 )}
 
-                {/* Dev Tool: Show Welcome Modal */}
-                <button
-                    onClick={() => setShowWelcome(true)}
-                    className="fixed bottom-4 right-4 z-50 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-lg transition-all hover:scale-105"
-                    title="Dev Tool: Show Welcome Modal"
-                >
-                    👋 Welcome
-                </button>
-
                 <div className="relative z-10 w-full h-full">
                     {view === 'landing' && (
                         <LandingPage
