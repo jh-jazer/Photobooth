@@ -3,7 +3,14 @@ import { Camera, Sparkles, Zap, Share2, ArrowRight, Aperture } from 'lucide-reac
 import { usePhotoBooth } from './photobooth/PhotoBoothContext';
 
 const LandingPage = ({ onStart, initialShowGallery = false, navigationSource = 'landing' }) => {
-    const { galleryImages, clearGallery } = usePhotoBooth();
+    const {
+        galleryImages,
+        clearGallery,
+        isFileSystemSupported,
+        useFileSystem,
+        enableFileSystemStorage,
+        disableFileSystemStorage
+    } = usePhotoBooth();
     const [showGallery, setShowGallery] = React.useState(initialShowGallery);
     const [showHowItWorks, setShowHowItWorks] = React.useState(false);
 
@@ -138,9 +145,39 @@ const LandingPage = ({ onStart, initialShowGallery = false, navigationSource = '
                         <div className="flex items-center justify-between mb-8">
                             <div>
                                 <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Gallery</h2>
-                                <p className="text-zinc-400 font-medium">Your captured moments ({galleryImages.length})</p>
+                                <div className="flex items-center gap-3 mt-2">
+                                    <p className="text-zinc-400 font-medium">Your captured moments ({galleryImages.length})</p>
+                                    {isFileSystemSupported && (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1 h-1 rounded-full bg-zinc-600"></div>
+                                            <span className={`text-xs font-bold uppercase tracking-wider ${useFileSystem ? 'text-green-400' : 'text-zinc-500'}`}>
+                                                {useFileSystem ? '📁 File System' : '💾 localStorage'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex gap-4">
+                                {/* File System Storage Toggle */}
+                                {isFileSystemSupported && (
+                                    <button
+                                        onClick={async () => {
+                                            if (useFileSystem) {
+                                                disableFileSystemStorage();
+                                            } else {
+                                                await enableFileSystemStorage();
+                                            }
+                                        }}
+                                        className={`px-4 py-2 rounded-xl font-bold transition-colors ${useFileSystem
+                                                ? 'bg-green-500/10 hover:bg-green-500/20 text-green-400'
+                                                : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400'
+                                            }`}
+                                        title={useFileSystem ? 'Disable File System Storage' : 'Enable Unlimited Storage'}
+                                    >
+                                        {useFileSystem ? 'Disable FS' : 'Enable Unlimited'}
+                                    </button>
+                                )}
+
                                 {galleryImages.length > 0 && (
                                     <button
                                         onClick={clearGallery}

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useRef, useEffect, useCallb
 import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { STRIP_DESIGNS } from '../../constants';
+import * as FileSystem from '../../utils/fileSystemStorage';
 
 const PhotoBoothContext = createContext();
 
@@ -65,6 +66,11 @@ export const PhotoBoothProvider = ({ children }) => {
     const [isDonationPopupOpen, setIsDonationPopupOpen] = useState(false);
     const [donationStep, setDonationStep] = useState('prompt'); // 'prompt' | 'qr'
 
+    // File System Access API State
+    const [isFileSystemSupported, setIsFileSystemSupported] = useState(false);
+    const [useFileSystem, setUseFileSystem] = useState(false);
+    const [directoryHandle, setDirectoryHandle] = useState(null);
+
     // Layout Prompt State
     const [showLayoutPrompt, setShowLayoutPrompt] = useState(false);
     const [pendingTemplateImage, setPendingTemplateImage] = useState(null);
@@ -110,67 +116,203 @@ export const PhotoBoothProvider = ({ children }) => {
     useEffect(() => { try { localStorage.setItem('recentBgImages', JSON.stringify(recentBgImages)); } catch (e) { console.warn('Storage full'); } }, [recentBgImages]);
     useEffect(() => { try { localStorage.setItem('recentTemplateImages', JSON.stringify(recentTemplateImages)); } catch (e) { console.warn('Storage full'); } }, [recentTemplateImages]);
 
-    // Gallery Persistence with Enhanced Error Handling
-    const [galleryImages, setGalleryImages] = useState(() => {
-        try {
-            const stored = localStorage.getItem('photobooth_gallery');
-            if (!stored) {
-                console.log('[Gallery] No stored gallery found, starting fresh');
-                return [];
-            }
-            const parsed = JSON.parse(stored);
-            if (!Array.isArray(parsed)) {
-                console.error('[Gallery] Invalid gallery data format, resetting');
-                localStorage.removeItem('photobooth_gallery');
-                return [];
-            }
-            console.log(`[Gallery] Loaded ${parsed.length} images from storage`);
-            return parsed;
-        } catch (e) {
-            console.error('[Gallery] Failed to load gallery from localStorage:', e);
-            // Try to clear corrupted data
-            try {
-                localStorage.removeItem('photobooth_gallery');
-            } catch (clearError) {
-                console.error('[Gallery] Could not clear corrupted data:', clearError);
-            }
-            return [];
-        }
-    });
+    // Gallery Persistence with File System API + localStorage fallback
+    const [galleryImages, setGalleryImages] = useState([]);
 
+    // Check File System API support on mount and auto-enable if supported
     useEffect(() => {
+        const initFileSystem = async () => {
+            const supported = FileSystem.isFileSystemSupported();
+            setIsFileSystemSupported(supported);
+            console.log(`[FileSystem] API supported: ${supported}`);
+
+            if (!supported) return;
+
+            // Try to load previously stored directory handle
+            const storedHandle = await FileSystem.getStoredDirectoryHandle();
+
+            if (storedHandle) {
+                // We have a stored handle with valid permissions
+                setDirectoryHandle(storedHandle);
+                setUseFileSystem(true);
+                console.log('[FileSystem] Restored previous directory selection');
+            } else if (!localStorage.getItem('photobooth_fs_prompted')) {
+                // First time user - prompt for directory selection
+                localStorage.setItem('photobooth_fs_prompted', 'true');
+
+                setTimeout(async () => {
+                    const handle = await FileSystem.requestDirectoryAccess();
+                    if (handle) {
+                        setDirectoryHandle(handle);
+                        setUseFileSystem(true);
+                        await FileSystem.saveDirectoryHandle(handle);
+                        console.log('[FileSystem] File System storage enabled');
+                    } else {
+                        console.log('[FileSystem] User declined, using localStorage');
+                    }
+                }, 1000);
+            }
+        };
+
+        initFileSystem();
+    }, []);
+
+    // Load gallery on mount
+    useEffect(() => {
+        const loadGallery = async () => {
+            // Try File System first if enabled and available
+            if (useFileSystem && directoryHandle) {
+                try {
+                    const images = await FileSystem.loadImagesFromDirectory(directoryHandle);
+                    setGalleryImages(images);
+                    console.log(`[FileSystem] Loaded ${images.length} images from directory`);
+                    return;
+                } catch (error) {
+                    console.error('[FileSystem] Failed to load from directory, falling back to localStorage:', error);
+                }
+            }
+
+            // Fallback to localStorage
+            try {
+                const stored = localStorage.getItem('photobooth_gallery');
+                if (!stored) {
+                    console.log('[Gallery] No stored gallery found, starting fresh');
+                    setGalleryImages([]);
+                    return;
+                }
+                const parsed = JSON.parse(stored);
+                if (!Array.isArray(parsed)) {
+                    console.error('[Gallery] Invalid gallery data format, resetting');
+                    localStorage.removeItem('photobooth_gallery');
+                    setGalleryImages([]);
+                    return;
+                }
+                console.log(`[Gallery] Loaded ${parsed.length} images from localStorage`);
+                setGalleryImages(parsed);
+            } catch (e) {
+                console.error('[Gallery] Failed to load gallery from localStorage:', e);
+                try {
+                    localStorage.removeItem('photobooth_gallery');
+                } catch (clearError) {
+                    console.error('[Gallery] Could not clear corrupted data:', clearError);
+                }
+                setGalleryImages([]);
+            }
+        };
+
+        loadGallery();
+    }, [useFileSystem, directoryHandle]);
+
+    // Save to localStorage (always as backup)
+    useEffect(() => {
+        if (galleryImages.length === 0) return; // Don't save empty array on initial load
+
         try {
             const data = JSON.stringify(galleryImages);
             const sizeInMB = (data.length / (1024 * 1024)).toFixed(2);
 
-            // Check storage quota (localStorage typically has 5-10MB limit)
-            if (data.length > 4 * 1024 * 1024) { // 4MB warning threshold
-                console.warn(`[Gallery] Storage size: ${sizeInMB}MB - approaching limit. Consider clearing old images.`);
+            // Only warn about storage if not using File System
+            if (!useFileSystem && data.length > 4 * 1024 * 1024) {
+                console.warn(`[Gallery] Storage size: ${sizeInMB}MB - approaching limit. Consider enabling File System storage.`);
             }
 
             localStorage.setItem('photobooth_gallery', data);
-            console.log(`[Gallery] Saved ${galleryImages.length} images (${sizeInMB}MB) to storage`);
+            console.log(`[Gallery] Saved ${galleryImages.length} images (${sizeInMB}MB) to localStorage`);
         } catch (e) {
             console.error('[Gallery] Failed to save gallery to localStorage:', e);
 
-            // Check if it's a quota exceeded error
-            if (e.name === 'QuotaExceededError' || e.code === 22) {
-                console.error('[Gallery] Storage quota exceeded! Gallery will only persist for this session.');
-                alert('Storage limit reached! Your gallery is full. Please clear some images to save new ones permanently.');
-            } else {
-                console.error('[Gallery] Unknown storage error:', e.message);
+            // Only show alerts if not using File System (which has unlimited storage)
+            if (!useFileSystem) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    console.error('[Gallery] Storage quota exceeded!');
+                    if (isFileSystemSupported) {
+                        alert('Storage limit reached! Enable File System storage for unlimited capacity.');
+                    } else {
+                        alert('Storage limit reached! Your gallery is full. Please clear some images.');
+                    }
+                } else {
+                    console.error('[Gallery] Unknown storage error:', e.message);
+                }
             }
         }
-    }, [galleryImages]);
+    }, [galleryImages, useFileSystem, isFileSystemSupported]);
 
-    const addToGallery = useCallback((dataUrl) => {
-        setGalleryImages(prev => [dataUrl, ...prev]);
-    }, []);
-
-    const clearGallery = () => {
-        if (window.confirm('Are you sure you want to clear your gallery?')) {
-            setGalleryImages([]);
+    const addToGallery = useCallback(async (dataUrl) => {
+        // Save to File System if enabled
+        if (useFileSystem && directoryHandle) {
+            try {
+                await FileSystem.saveImageToDirectory(dataUrl, directoryHandle);
+                console.log('[FileSystem] Image saved to directory');
+            } catch (error) {
+                console.error('[FileSystem] Failed to save to directory:', error);
+            }
         }
+
+        // Always update state (which triggers localStorage save)
+        setGalleryImages(prev => [dataUrl, ...prev]);
+    }, [useFileSystem, directoryHandle]);
+
+    const clearGallery = async () => {
+        if (!window.confirm('Are you sure you want to clear your gallery?')) {
+            return;
+        }
+
+        // Clear File System directory if enabled
+        if (useFileSystem && directoryHandle) {
+            try {
+                const deletedCount = await FileSystem.clearDirectory(directoryHandle);
+                console.log(`[FileSystem] Cleared ${deletedCount} images from directory`);
+            } catch (error) {
+                console.error('[FileSystem] Failed to clear directory:', error);
+            }
+        }
+
+        // Clear localStorage
+        try {
+            localStorage.removeItem('photobooth_gallery');
+            console.log('[Gallery] Cleared localStorage');
+        } catch (error) {
+            console.error('[Gallery] Failed to clear localStorage:', error);
+        }
+
+        // Clear state
+        setGalleryImages([]);
+    };
+
+    // Enable File System Storage
+    const enableFileSystemStorage = async () => {
+        if (!isFileSystemSupported) {
+            alert('File System Access API is not supported in your browser. Please use Chrome or Edge.');
+            return false;
+        }
+
+        try {
+            const handle = await FileSystem.requestDirectoryAccess();
+            if (handle) {
+                setDirectoryHandle(handle);
+                setUseFileSystem(true);
+                await FileSystem.saveDirectoryHandle(handle);
+
+                // Load images from directory
+                const images = await FileSystem.loadImagesFromDirectory(handle);
+                setGalleryImages(images);
+
+                console.log('[FileSystem] File System storage enabled');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('[FileSystem] Failed to enable File System storage:', error);
+            return false;
+        }
+    };
+
+    // Disable File System Storage
+    const disableFileSystemStorage = () => {
+        setUseFileSystem(false);
+        setDirectoryHandle(null);
+        localStorage.removeItem('photobooth_directory_name');
+        console.log('[FileSystem] File System storage disabled, using localStorage');
     };
 
     const saveTemplate = (name) => {
@@ -685,20 +827,74 @@ export const PhotoBoothProvider = ({ children }) => {
                         newWindow.document.close();
                     }
                 } else {
-                    // For desktop: use standard download
-                    const link = document.createElement('a');
-                    link.download = filename;
-                    link.href = dataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    // For desktop: use File System Access API if supported, otherwise standard download
+                    if ('showSaveFilePicker' in window) {
+                        try {
+                            // Generate timestamp for default filename
+                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                            const suggestedName = `photobooth_${timestamp}.${format}`;
+
+                            // Show save file picker
+                            const fileHandle = await window.showSaveFilePicker({
+                                suggestedName,
+                                types: [{
+                                    description: 'Image Files',
+                                    accept: {
+                                        'image/png': ['.png'],
+                                        'image/jpeg': ['.jpg', '.jpeg']
+                                    }
+                                }]
+                            });
+
+                            // Convert data URL to blob
+                            const response = await fetch(dataUrl);
+                            const blob = await response.blob();
+
+                            // Write to file
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+
+                            console.log('[FileSystem] Image saved to:', fileHandle.name);
+                        } catch (error) {
+                            if (error.name === 'AbortError') {
+                                console.log('[FileSystem] User cancelled save');
+                                stripRef.current.style.transform = originalTransform;
+                                return; // Don't show donation popup if cancelled
+                            }
+                            console.error('[FileSystem] Save failed, falling back to standard download:', error);
+                            // Fall back to standard download
+                            const link = document.createElement('a');
+                            link.download = filename;
+                            link.href = dataUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    } else {
+                        // Fallback: standard download for browsers without File System API
+                        const link = document.createElement('a');
+                        link.download = filename;
+                        link.href = dataUrl;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
                 }
             }
 
-            // Show donation popup on success
+            // Show donation popup on success (once every 20 minutes)
             stripRef.current.style.transform = originalTransform;
-            setIsDonationPopupOpen(true);
-            setDonationStep('prompt');
+
+            const lastDonationTime = localStorage.getItem('photobooth_last_donation_popup');
+            const now = Date.now();
+            const twentyMinutes = 20 * 60 * 1000; // 20 minutes in milliseconds
+
+            if (!lastDonationTime || (now - parseInt(lastDonationTime)) > twentyMinutes) {
+                setIsDonationPopupOpen(true);
+                setDonationStep('prompt');
+                localStorage.setItem('photobooth_last_donation_popup', now.toString());
+            }
         } catch (err) {
             console.error(err);
             stripRef.current.style.transform = originalTransform;
@@ -783,9 +979,16 @@ export const PhotoBoothProvider = ({ children }) => {
                 iframe.onload();
             }
 
-            // Show donation popup on success
-            setIsDonationPopupOpen(true);
-            setDonationStep('prompt');
+            // Show donation popup on success (once every 20 minutes)
+            const lastDonationTime = localStorage.getItem('photobooth_last_donation_popup');
+            const now = Date.now();
+            const twentyMinutes = 20 * 60 * 1000; // 20 minutes in milliseconds
+
+            if (!lastDonationTime || (now - parseInt(lastDonationTime)) > twentyMinutes) {
+                setIsDonationPopupOpen(true);
+                setDonationStep('prompt');
+                localStorage.setItem('photobooth_last_donation_popup', now.toString());
+            }
         } catch (err) {
             console.error(err);
             stripRef.current.style.transform = originalTransform;
@@ -970,6 +1173,13 @@ export const PhotoBoothProvider = ({ children }) => {
 
         // Gallery
         galleryImages, addToGallery, clearGallery,
+
+        // File System Access API
+        isFileSystemSupported,
+        useFileSystem,
+        directoryHandle,
+        enableFileSystemStorage,
+        disableFileSystemStorage,
 
         // Undo/Redo
         undo,
