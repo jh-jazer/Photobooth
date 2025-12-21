@@ -24,7 +24,8 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
         retakeIndex,
         setRetakeIndex,
         setMaxPhotos,
-        selectedFilter
+        selectedFilter,
+        isCameraMirrored, setIsCameraMirrored
     } = usePhotoBooth();
 
     const [devices, setDevices] = useState([]);
@@ -107,7 +108,7 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
                     ref={webcamRef}
                     screenshotFormat="image/jpeg"
                     videoConstraints={videoConstraints} // Use constraints
-                    mirrored={true}
+                    mirrored={isCameraMirrored}
                     className="w-full h-full object-cover"
                     style={{ filter: CAMERA_FILTERS.find(f => f.id === selectedFilter)?.filter || 'none' }}
                     onUserMedia={() => navigator.mediaDevices.enumerateDevices().then(handleDevices)}
@@ -123,15 +124,27 @@ const CaptureStation = ({ className = '', onHome, setShowGallery }) => {
                         <div className="absolute left-2/3 h-full w-px bg-white/50"></div>
                     </div>
 
-                    {/* Camera Switcher (Top Left) */}
-                    {devices.length > 1 && !isCapturingLoop && (
-                        <div className="absolute top-6 left-6 z-30 pointer-events-auto">
+                    {/* Camera Controls (Top Left) */}
+                    {!isCapturingLoop && (
+                        <div className="absolute top-6 left-6 z-30 pointer-events-auto flex gap-2">
+                            {/* Camera Switcher */}
+                            {devices.length > 1 && (
+                                <button
+                                    onClick={switchCamera}
+                                    className="bg-black/40 text-white/70 hover:text-white hover:bg-black/60 p-2 rounded-full backdrop-blur-sm transition-all border border-white/10"
+                                    title="Switch Camera"
+                                >
+                                    <SwitchCamera size={20} />
+                                </button>
+                            )}
+
+                            {/* Flip/Mirror Toggle */}
                             <button
-                                onClick={switchCamera}
+                                onClick={() => setIsCameraMirrored(!isCameraMirrored)}
                                 className="bg-black/40 text-white/70 hover:text-white hover:bg-black/60 p-2 rounded-full backdrop-blur-sm transition-all border border-white/10"
-                                title="Switch Camera"
+                                title={isCameraMirrored ? "Unmirror Camera" : "Mirror Camera"}
                             >
-                                <SwitchCamera size={20} />
+                                <Image size={20} className={`transition-transform ${isCameraMirrored ? 'scale-x-[-1]' : ''}`} />
                             </button>
                         </div>
                     )}

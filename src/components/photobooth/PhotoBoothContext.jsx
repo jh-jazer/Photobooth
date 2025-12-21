@@ -28,6 +28,7 @@ export const PhotoBoothProvider = ({ children }) => {
     // UI State
     const [showPreview, setShowPreview] = useState(false);
     const [showConfig, setShowConfig] = useState(false);
+    const [isCameraMirrored, setIsCameraMirrored] = useState(true); // Default to mirrored for selfie mode
 
     // Layout State (Custom)
     const [layoutGap, setLayoutGap] = useState(13);
@@ -109,17 +110,56 @@ export const PhotoBoothProvider = ({ children }) => {
     useEffect(() => { try { localStorage.setItem('recentBgImages', JSON.stringify(recentBgImages)); } catch (e) { console.warn('Storage full'); } }, [recentBgImages]);
     useEffect(() => { try { localStorage.setItem('recentTemplateImages', JSON.stringify(recentTemplateImages)); } catch (e) { console.warn('Storage full'); } }, [recentTemplateImages]);
 
-    // Gallery Persistence
+    // Gallery Persistence with Enhanced Error Handling
     const [galleryImages, setGalleryImages] = useState(() => {
         try {
-            return JSON.parse(localStorage.getItem('photobooth_gallery')) || [];
-        } catch { return []; }
+            const stored = localStorage.getItem('photobooth_gallery');
+            if (!stored) {
+                console.log('[Gallery] No stored gallery found, starting fresh');
+                return [];
+            }
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+                console.error('[Gallery] Invalid gallery data format, resetting');
+                localStorage.removeItem('photobooth_gallery');
+                return [];
+            }
+            console.log(`[Gallery] Loaded ${parsed.length} images from storage`);
+            return parsed;
+        } catch (e) {
+            console.error('[Gallery] Failed to load gallery from localStorage:', e);
+            // Try to clear corrupted data
+            try {
+                localStorage.removeItem('photobooth_gallery');
+            } catch (clearError) {
+                console.error('[Gallery] Could not clear corrupted data:', clearError);
+            }
+            return [];
+        }
     });
+
     useEffect(() => {
         try {
-            localStorage.setItem('photobooth_gallery', JSON.stringify(galleryImages));
+            const data = JSON.stringify(galleryImages);
+            const sizeInMB = (data.length / (1024 * 1024)).toFixed(2);
+
+            // Check storage quota (localStorage typically has 5-10MB limit)
+            if (data.length > 4 * 1024 * 1024) { // 4MB warning threshold
+                console.warn(`[Gallery] Storage size: ${sizeInMB}MB - approaching limit. Consider clearing old images.`);
+            }
+
+            localStorage.setItem('photobooth_gallery', data);
+            console.log(`[Gallery] Saved ${galleryImages.length} images (${sizeInMB}MB) to storage`);
         } catch (e) {
-            console.warn('Gallery storage full - session only');
+            console.error('[Gallery] Failed to save gallery to localStorage:', e);
+
+            // Check if it's a quota exceeded error
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                console.error('[Gallery] Storage quota exceeded! Gallery will only persist for this session.');
+                alert('Storage limit reached! Your gallery is full. Please clear some images to save new ones permanently.');
+            } else {
+                console.error('[Gallery] Unknown storage error:', e.message);
+            }
         }
     }, [galleryImages]);
 
@@ -889,11 +929,11 @@ export const PhotoBoothProvider = ({ children }) => {
                 addToRecents('color', color);
             }, 1000);
         },
-        addToRecents,
         bgImage, setBgImage,
         templateImage, setTemplateImage,
         showPreview, setShowPreview,
         showConfig, setShowConfig,
+        isCameraMirrored, setIsCameraMirrored,
         layoutGap, setLayoutGap,
         layoutPaddingTop, setLayoutPaddingTop,
         layoutPaddingSide, setLayoutPaddingSide,
